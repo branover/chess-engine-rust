@@ -1,4 +1,5 @@
 mod board;
+mod pieces;
 
 fn main() {
     // let b = board::Board::default();

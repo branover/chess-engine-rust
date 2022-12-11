@@ -1,3 +1,8 @@
+use crate::pieces::{
+    Piece,
+    PieceColor,
+};
+
 use std::fmt;
 use colored::*;
 
@@ -52,8 +57,8 @@ impl Square {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Coord {
-    x: usize,
-    y: usize,
+    pub x: usize,
+    pub y: usize,
 }
 
 impl Coord {
@@ -62,83 +67,15 @@ impl Coord {
         let mut chars = notation.chars();
         let x = chars.next().ok_or(BoardError::ParseError("Invalid notation".to_string()))?;
         let y = chars.next().ok_or(BoardError::ParseError("Invalid notation".to_string()))?;
-        let x = 8 - (x as u8 - 97);
+        let x = x as u8 - 97;
         let y = 7 - (y as u8 - 49);
+        println!("{} -> ({}, {})", notation, x, y);
+
         if x > 7 || y > 7 {
             return Err(BoardError::ParseError("Invalid notation".to_string()));
         }
         Ok(Coord { x: x as usize, y: y as usize })
     }
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum PieceColor {
-    White,
-    Black,
-}
-
-impl PieceColor {
-    pub fn opposite(self) -> Self {
-        match self {
-            PieceColor::White => PieceColor::Black,
-            PieceColor::Black => PieceColor::White,
-        }
-    }
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum PieceKind {
-    Pawn,
-    Knight,
-    Bishop,
-    Rook,
-    Queen,
-    King,
-}
-use PieceKind::*;
-
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Piece {
-    color: PieceColor,
-    piece: PieceKind,
-}
-
-impl Piece {
-    pub const fn pawn(color: PieceColor) -> Self {
-        Self { piece: Pawn, color }
-    }
-
-    pub const fn knight(color: PieceColor) -> Self {
-        Self { piece: Knight, color }
-    }
-
-    pub const fn bishop(color: PieceColor) -> Self {
-        Self { piece: Bishop, color } 
-    }
-
-    pub const fn rook(color: PieceColor) -> Self {
-        Self { piece: Rook, color }
-    }
-
-    pub const fn queen(color: PieceColor) -> Self {
-        Self { piece: Queen, color }
-    }
-
-    pub const fn king(color: PieceColor) -> Self {
-        Self { piece: King, color }
-    }
-
-    fn fancy_char(self) -> &'static str {
-        match self.piece {
-            Pawn => "♙",
-            Knight => "♞",
-            Bishop => "♝",
-            Rook => "♜",
-            Queen => "♛",
-            King => "♚",
-        }
-    }
-    
 }
 
 #[derive(PartialEq)]
@@ -303,13 +240,29 @@ impl Board {
         let from = Coord::from_notation(notation_from)?;
         let to = Coord::from_notation(notation_to)?;
         if !self.is_valid_move(from, to) {
-            return Err(BoardError::MoveError("Invalid move".to_string()));
+            return Err(BoardError::MoveError(format!("Invalid move from {} to {}", notation_from, notation_to)));
         }
         self.move_piece(from, to)
     }
 
     pub fn is_valid_move(&self, from: Coord, to: Coord) -> bool {
+        let piece = match self.board[from.y][from.x] {
+            Square::Occupied(piece) => piece,
+            _ => return false,
+        };
+
+        if !piece.is_valid_piece_move(from, to) {
+            return false;
+        }
+
         true
+    }
+
+    pub fn piece_at(&self, coord: Coord) -> Option<Piece> {
+        match self.board[coord.y][coord.x] {
+            Square::Occupied(piece) => Some(piece),
+            _ => None,
+        }
     }
 
 }
@@ -328,4 +281,6 @@ mod tests {
 
         assert!(default_board == fen_board)
     }
+
+   
 }
