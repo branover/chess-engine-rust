@@ -85,6 +85,13 @@ impl Coord {
 }
 
 #[derive(PartialEq, Debug)]
+pub struct Move {
+    pub from: Coord,
+    pub to: Coord,
+    pub promote: Option<PieceKind>,
+}
+
+#[derive(PartialEq, Debug)]
 pub struct Board {
     pub board: [[Square; 8]; 8],
     pub turn: PieceColor,
@@ -445,47 +452,25 @@ impl Board {
         false
     }
 
-}
+    pub fn list_all_valid_moves(&self) -> Vec<Move> {
+        let mut moves: Vec<Move> = Vec::new();
 
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn board_builder() {
-        let fen_board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
-        let default_board: Board = Board::default();
-
-        fen_board.pretty_print_board();
-        default_board.pretty_print_board();
-
-        assert!(default_board == fen_board)
+        for y in 0..8 {
+            for x in 0..8 {
+                let coord = Coord { x, y };
+                if let Some(piece) = self.piece_at(coord) {
+                    if piece.color == self.turn {
+                        let this_piece_moves = piece.list_possible_moves(coord);
+                        this_piece_moves.iter().for_each(|m| {
+                            if self.is_valid_move(coord, *m) {
+                                moves.push(Move { from: coord, to: *m, promote: None});
+                            }
+                        });
+                    }
+                }
+            }
+        }
+        moves
     }
 
-    #[test]
-    fn board_builder_black_starting() {
-        let fen_board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1").unwrap();
-
-        assert!(fen_board.turn == PieceColor::Black);
-    }
-
-    #[test]
-    fn test_notation() {
-        let from = "a3";
-        assert!(Coord::from_notation(from).unwrap() == Coord { x: 0, y: 5 });
-
-        let from = "h8";
-        assert!(Coord::from_notation(from).unwrap() == Coord { x: 7, y: 0 });
-    }
-
-    #[test]
-    fn test_notation_invalid() {
-        let from = "i3";
-        assert!(Coord::from_notation(from).is_err());
-
-        let from = "a9";
-        assert!(Coord::from_notation(from).is_err());
-    }
-
-   
 }

@@ -1,5 +1,8 @@
+#![feature(test)]
+
 mod board;
 mod pieces;
+mod test;
 use std::io::Write;
 
 fn main() {
