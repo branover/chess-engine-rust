@@ -1,6 +1,7 @@
 use crate::pieces::{
     Piece,
     PieceColor,
+    PieceKind,
 };
 
 use std::fmt;
@@ -34,7 +35,7 @@ impl std::error::Error for BoardError {}
 impl fmt::Display for BoardError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &*self {
-            BoardError::ParseError(desc) => write!(f, "Error parsing FEN: {}", desc),
+            BoardError::ParseError(desc) => write!(f, "Error parsing input: {}", desc),
             BoardError::MoveError(desc) => write!(f, "Error making move: {}", desc),
         }
     }
@@ -67,14 +68,24 @@ impl Coord {
         let mut chars = notation.chars();
         let x = chars.next().ok_or(BoardError::ParseError("Invalid notation".to_string()))?;
         let y = chars.next().ok_or(BoardError::ParseError("Invalid notation".to_string()))?;
+        if x < 'a' || x > 'h' || y < '1' || y > '8' {
+            return Err(BoardError::ParseError("Invalid notation".to_string()));
+        }
+
         let x = x as u8 - 97;
         let y = 7 - (y as u8 - 49);
-        println!("{} -> ({}, {})", notation, x, y);
+        // println!("{} -> ({}, {})", notation, x, y);
 
         if x > 7 || y > 7 {
             return Err(BoardError::ParseError("Invalid notation".to_string()));
         }
         Ok(Coord { x: x as usize, y: y as usize })
+    }
+
+    pub fn to_notation(self) -> String {
+        let x = (self.x as u8 + 97) as char;
+        let y = (7 - self.y as u8 + 49) as char;
+        format!("{}{}", x, y)
     }
 }
 
@@ -236,13 +247,29 @@ impl Board {
         }
     }
 
-    pub fn do_move(&mut self, notation_from: &str, notation_to: &str) -> Result<()> {
-        let from = Coord::from_notation(notation_from)?;
-        let to = Coord::from_notation(notation_to)?;
+    pub fn do_move(&mut self, from: &str, to: &str) -> Result<()> {
+        self.do_move_coord(Coord::from_notation(from)?, Coord::from_notation(to)?)
+    }
+
+    pub fn do_move_coord(&mut self, from: Coord, to: Coord) -> Result<()> {
         if !self.is_valid_move(from, to) {
-            return Err(BoardError::MoveError(format!("Invalid move from {} to {}", notation_from, notation_to)));
+            return Err(BoardError::MoveError(format!("Invalid move from {} to {}", from.to_notation(), to.to_notation())));
         }
-        self.move_piece(from, to)
+
+        self.move_piece(from, to)?;    
+        self.turn = match self.turn {
+            PieceColor::White => PieceColor::Black,
+            PieceColor::Black => PieceColor::White,
+        };
+        Ok(())
+    }
+
+    pub fn parse_move(&self, notation: &str) -> Result<(String, String)> {
+        let mut chars = notation.chars();
+        let from = chars.by_ref().take(2).collect::<String>();
+        let to = chars.by_ref().take(2).collect::<String>();
+        // let promotion = chars.next().map(|c| PieceKind::from_char(c));
+        Ok((from, to))
     }
 
     pub fn is_valid_move(&self, from: Coord, to: Coord) -> bool {
@@ -251,7 +278,30 @@ impl Board {
             _ => return false,
         };
 
+        // Stops pieces from moving if it's not their turn
+        if piece.color != self.turn {
+            return false;
+        }
+
+        // Stops pieces from moving to the same square or to invalid squares for that type of piece
         if !piece.is_valid_piece_move(from, to) {
+            return false;
+        }
+
+        // Stops pieces from capturing the same color and pawns from moving diagonally without capturing
+        if let Some(piece_at) = self.piece_at(to) {
+            if piece_at.color == piece.color {
+                return false;
+            }
+            if piece.kind == PieceKind::Pawn && (to.x == from.x) {
+                return false;
+            }
+        } else if piece.kind == PieceKind::Pawn && (to.x != from.x) {
+            return false;
+        }
+
+        // Stops pieces from moving through other pieces (except knights)
+        if piece.kind != PieceKind::Knight && self.move_blocked(from, to) {
             return false;
         }
 
@@ -263,6 +313,40 @@ impl Board {
             Square::Occupied(piece) => Some(piece),
             _ => None,
         }
+    }
+
+    pub fn move_blocked(&self, from: Coord, to: Coord) -> bool {
+        let mut x: i32 = from.x as i32;
+        let mut y: i32 = from.y as i32;
+
+        let mut x_dir: i32;
+        let mut y_dir: i32;
+
+        if from.x < to.x {
+            x_dir = 1;
+        } else if from.x > to.x {
+            x_dir = -1;
+        } else {
+            x_dir = 0;
+        }
+
+        if from.y < to.y {
+            y_dir = 1;
+        } else if from.y > to.y {
+            y_dir = -1;
+        } else {
+            y_dir = 0;
+        }
+
+        while x != to.x as i32 || y != to.y as i32 {
+            x += x_dir;
+            y += y_dir;
+            if self.board[y as usize][x as usize] != Square::Empty && (x != to.x as i32 || y != to.y as i32) {
+                return true;
+            }
+        }
+
+        false
     }
 
 }
@@ -280,6 +364,13 @@ mod tests {
         default_board.pretty_print_board();
 
         assert!(default_board == fen_board)
+    }
+
+    #[test]
+    fn board_builder_black_starting() {
+        let fen_board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1").unwrap();
+
+        assert!(fen_board.turn == PieceColor::Black);
     }
 
    
