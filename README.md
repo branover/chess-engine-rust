@@ -12,9 +12,11 @@ Chess engine I'm making in rust for fun to learn more about the language, chess 
 - [x] Implement checking that moves are valid based on state of the board (minus check)
 - [x] Implement basic game loop
 - [x] Implement castling
-- [ ] Implement en passant
-- [ ] Implement looking for check (also during castling)
+- [x] Implement en passant
+- [x] Implement looking for check (also during castling)
+- [x] Implement moves that remove check
 - [ ] Implement looking for checkmate
+- [ ] Implement halfmove and fullmove counters
 - [ ] Create user interface for easily creating and restarting games
 - [ ] Add mouse clicking as way to move pieces
 - [ ] Add ability to import a game based on algebraic notation
@@ -24,4 +26,5 @@ Chess engine I'm making in rust for fun to learn more about the language, chess 
 - [ ] Add basic CPU bot that makes random valid moves
 - [ ] Add more advanced CPU bot that looks for "good" moves
 - [ ] Make an actual chess engine
+- [ ] Add time control
 - [ ] Implement API to interact with public chess engines

@@ -7,9 +7,12 @@ mod tests {
     use crate::board::{
         Board,
         Coord,
+        Square,
     };
     use crate::pieces::{
+        Piece,
         PieceColor,
+        PieceKind,
     };
 
 
@@ -430,6 +433,82 @@ mod tests {
         board.do_move("g2", "g3").unwrap();
         board.do_move("g6", "g5").unwrap();
         board.do_move("e1", "g1").unwrap();
+    }
+
+    #[test]
+    fn en_passant() {
+        let mut board = Board::from_fen("r3kb1r/pppqppp1/2n1bn2/3p2Pp/4P3/P2B1N1P/1PPP1P2/RNBQK2R w KQkq h6 0 1").unwrap();
+        board.do_move("g5", "h6").unwrap();
+        assert_eq!(board.piece_at(Coord{x: 7, y: 2}).unwrap(), Piece {kind: PieceKind::Pawn, color: PieceColor::White});
+        assert_eq!(board.board[3][7], Square::Empty);
+    }
+
+    #[test]
+    fn en_passant_move() {
+        let mut board = Board::from_fen("r3kb1r/pppqpppp/2n1bn2/3p2P1/4P3/P2B1N1P/1PPP1P2/RNBQK2R b KQkq - 0 1").unwrap();
+        board.do_move("h7", "h5").unwrap();
+        board.do_move("g5", "h6").unwrap();
+        assert_eq!(board.piece_at(Coord{x: 7, y: 2}).unwrap(), Piece {kind: PieceKind::Pawn, color: PieceColor::White});
+        assert_eq!(board.board[3][7], Square::Empty);
+    }
+
+    #[test]
+    fn en_passant_invalid() {
+        let mut board = Board::from_fen("r3kb1r/pppqppp1/2n1bn1p/3p2P1/4P3/P2B1N1P/1PPP1P2/RNBQK2R b KQkq - 0 1").unwrap();
+        board.do_move("h6", "h5").unwrap();
+        let result = board.do_move("g5", "h6");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn in_check() {
+        let board = Board::from_fen("rnb1kbnr/pppp1ppp/8/4p3/4P2q/5P2/PPPP2PP/RNBQKBNR w KQkq - 0 1").unwrap();
+        assert!(board.in_check.0 == true);
+    }
+
+    #[test]
+    fn in_check_after_move() {
+        let mut board = Board::from_fen("rnbqkbnr/pppp1ppp/8/4p3/4P3/5P2/PPPP2PP/RNBQKBNR b KQkq - 0 1").unwrap();
+        assert!(board.in_check.0 == false);
+        board.do_move("d8", "h4").unwrap();
+        assert!(board.in_check.0 == true);
+    }
+
+    #[test]
+    fn block_check() {
+        let mut board = Board::from_fen("rnbqkbnr/pppp2pp/5p2/4p3/3PP3/5P2/PPP3PP/RNBQKBNR b KQkq - 0 1").unwrap();
+        assert!(board.in_check.0 == false);
+        board.do_move("f8", "b4").unwrap();
+        assert!(board.in_check.0 == true);
+        board.do_move("c2", "c3").unwrap();
+        assert!(board.in_check.0 == false);
+    }
+
+    #[test]
+    fn cant_move_without_blocking_check() {
+        let mut board = Board::from_fen("rnbqkbnr/pppp2pp/5p2/4p3/3PP3/5P2/PPP3PP/RNBQKBNR b KQkq - 0 1").unwrap();
+        assert!(board.in_check.0 == false);
+        board.do_move("f8", "b4").unwrap();
+        assert!(board.in_check.0 == true);
+        let result = board.do_move("a2", "a3");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn cant_castle_out_of_check() {
+        let mut board = Board::from_fen("r1bqk1nr/ppp3pp/2np1p2/4p3/1b1PP3/3B1P2/PPP1N1PP/RNBQK2R w KQkq - 0 1").unwrap();
+        assert!(board.get_check() == true);
+        let result = board.do_move("e1", "g1");
+        assert!(result.is_err());
+    }   
+
+    #[test]
+    fn cant_castle_into_check() {
+        let mut board = Board::from_fen("r1bqk1nr/ppp3pp/2np1p2/4p3/3bP3/3B1P2/PPP1N1PP/RNBQK2R w KQkq - 0 1").unwrap();
+        assert!(board.get_check() == false);
+        let result = board.do_move("e1", "g1");
+        board.pretty_print_board();
+        assert!(result.is_err());
     }
 
 }

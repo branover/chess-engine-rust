@@ -7,22 +7,6 @@ use crate::pieces::{
 use std::fmt;
 use colored::*;
 
-// const PAWN: u8 = 1;
-// const KNIGHT: u8 = 2;
-// const BISHOP: u8 = 3;
-// const ROOK: u8 = 4;
-// const QUEEN: u8 = 5;
-// const KING: u8 = 6;
-// const BLACK: u8 = 0;
-// const WHITE: u8 = 10;
-// const W_PAWN: u8 = PAWN + WHITE;
-// const W_KNIGHT: u8 = KNIGHT + WHITE;
-// const W_BISHOP: u8 = BISHOP + WHITE;
-// const W_ROOK: u8 = ROOK + WHITE;
-// const W_QUEEN: u8 = QUEEN + WHITE;
-// const W_KING: u8 = KING + WHITE;
-
-
 #[derive(Debug)]
 pub enum BoardError {
     ParseError(String),
@@ -91,15 +75,16 @@ pub struct Move {
     pub promote: Option<PieceKind>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Board {
     pub board: [[Square; 8]; 8],
     pub turn: PieceColor,
-    pub white_king: (u8, u8),
-    pub black_king: (u8, u8),
+    pub white_king: Coord,
+    pub black_king: Coord,
     pub white_castle: (bool, bool),
     pub black_castle: (bool, bool),
-    pub en_passant: Option<(u8, u8)>,
+    pub in_check: (bool, bool),
+    pub en_passant: Option<Coord>,
     pub halfmove_clock: u8,
     pub fullmove_number: u8,
 }
@@ -109,10 +94,11 @@ impl Board {
         Board {
             board: [[Square::Empty; 8]; 8],
             turn: PieceColor::White,
-            white_king: (4, 0),
-            black_king: (4, 7),
+            white_king: Coord {x: 4, y: 7},
+            black_king: Coord {x: 4, y: 0},
             white_castle: (true, true),
             black_castle: (true, true),
+            in_check: (false, false),
             en_passant: None,
             halfmove_clock: 0,
             fullmove_number: 1,
@@ -203,13 +189,7 @@ impl Board {
 
         let en_passant = fen.next().ok_or(BoardError::ParseError("Invalid length of FEN".to_string()))?;
         if en_passant != "-" {
-            let mut chars = en_passant.chars();
-            let x = chars.next().ok_or(BoardError::ParseError("Invalid en passant row".to_string()))?;
-            let y = chars.next().ok_or(BoardError::ParseError("Invalid en passant column".to_string()))?;
-            board.en_passant = Some((x as u8 - 97, y as u8 - 49));
-            if board.en_passant.unwrap().0 > 7 || board.en_passant.unwrap().0 > 7 {
-                return Err(BoardError::ParseError("Invalid en passant square".to_string()));
-            }
+            board.en_passant = Some(Coord::from_notation(en_passant)?);
         }
 
         let halfmove_clock = fen.next().ok_or(BoardError::ParseError("Missing halfmove clock".to_string()))?;
@@ -218,6 +198,8 @@ impl Board {
         let fullmove_number = fen.next().ok_or(BoardError::ParseError("Missing fullmove clock".to_string()))?;
         board.fullmove_number = fullmove_number.parse::<u8>().map_err(|_| BoardError::ParseError("Invalid fullmove clock".to_string()))?;
 
+        board.set_check();
+        
         Ok(board)
     }
 
@@ -252,29 +234,44 @@ impl Board {
             self.board[from.y][from.x] = Square::Empty;
             self.board[to.y][to.x] = Square::Occupied(piece);
 
-            // Remove ability to castle based on moved piece
-            if piece.kind == PieceKind::King {
-                if piece.color == PieceColor::White {
-                    self.white_castle = (false, false);
-                } else {
-                    self.black_castle = (false, false);
-                }
-            } else if piece.kind == PieceKind::Rook {
-                if piece.color == PieceColor::White {
-                    if from.x == 0 {
-                        self.white_castle.1 = false;
-                    } else if from.x == 7 {
-                        self.white_castle.0 = false;
-                    }
-                } else {
-                    if from.x == 0 {
-                        self.black_castle.1 = false;
-                    } else if from.x == 7 {
-                        self.black_castle.0 = false;
-                    }
-                }
-            }
+            // Clear en passant square
+            self.en_passant = None;
 
+            match piece.kind {
+                PieceKind::Pawn => {
+                    // Set en passant square
+                    if (from.y as i8 - to.y as i8).abs() == 2 {
+                        self.en_passant = Some(Coord{x: from.x, y: (from.y + to.y) / 2});
+                    }
+                },
+                PieceKind::King => {
+                    // Remove ability to castle based on moved piece
+                    if piece.color == PieceColor::White {
+                        self.white_castle = (false, false);
+                        self.white_king = to;
+                    } else {
+                        self.black_castle = (false, false);
+                        self.black_king = to;
+                    }
+                },
+                PieceKind::Rook => {
+                    // Remove ability to castle based on moved piece
+                    if piece.color == PieceColor::White {
+                        if from.x == 0 {
+                            self.white_castle.1 = false;
+                        } else if from.x == 7 {
+                            self.white_castle.0 = false;
+                        }
+                    } else {
+                        if from.x == 0 {
+                            self.black_castle.1 = false;
+                        } else if from.x == 7 {
+                            self.black_castle.0 = false;
+                        }
+                    }
+                },
+                _ => {}
+            }
             Ok(())
         } else {
             Err(BoardError::MoveError("No piece to move".to_string()))
@@ -288,11 +285,12 @@ impl Board {
     pub fn do_move_from_coord(&mut self, from: Coord, to: Coord) -> Result<()> {
         if self.is_castle(from, to) {
             self.do_castle(from, to)?;
+        } else if self.is_en_passant(from, to) {
+            self.do_en_passant(from, to)?;
         } else {
             if !self.is_valid_move(from, to) {
                 return Err(BoardError::MoveError(format!("Invalid move from {} to {}", from.to_notation(), to.to_notation())));
             }
-
             self.move_piece(from, to)?; 
         }
    
@@ -300,6 +298,7 @@ impl Board {
             PieceColor::White => PieceColor::Black,
             PieceColor::Black => PieceColor::White,
         };
+        self.set_check();
         Ok(())
     }
 
@@ -312,8 +311,8 @@ impl Board {
     }
 
     pub fn is_valid_move(&self, from: Coord, to: Coord) -> bool {
-        let piece = match self.board[from.y][from.x] {
-            Square::Occupied(piece) => piece,
+        let piece = match self.piece_at(from) {
+            Some(piece) => piece,
             _ => return false,
         };
 
@@ -321,6 +320,28 @@ impl Board {
         if piece.color != self.turn {
             return false;
         }
+
+        if !self.can_attack_square(from, to) {
+            return false
+        }
+
+        // If the player is in check, they must remove check
+        if self.get_check() && !self.removes_check(from, to) {
+            return false;
+        }
+
+        if self.would_be_in_check(from, to) {
+            return false;
+        }
+
+        true
+    }
+
+    fn can_attack_square(&self, from: Coord, to: Coord) -> bool {
+        let piece = match self.piece_at(from) {
+            Some(piece) => piece,
+            _ => return false,
+        };
 
         // Stops pieces from moving to the same square or to invalid squares for that type of piece
         if !piece.is_valid_piece_move(from, to) {
@@ -336,7 +357,13 @@ impl Board {
                 return false;
             }
         } else if piece.kind == PieceKind::Pawn && (to.x != from.x) {
-            return false;
+            if let Some(en_passant) = self.en_passant {
+                if en_passant != to {
+                    return false;
+                }
+            } else {
+                return false;
+            }
         }
 
         // Stops pieces from moving through other pieces (except knights)
@@ -347,7 +374,20 @@ impl Board {
         true
     }
 
+    fn is_castle(&self, from: Coord, to: Coord) -> bool {
+        if let Some(piece) = self.piece_at(from) {
+            if piece.kind == PieceKind::King && (to.x == from.x + 2 || to.x == from.x - 2) {
+                return true;
+            }
+        }
+        false
+    }
+
     fn do_castle(&mut self, from: Coord, to: Coord) -> Result<()> {
+        if self.get_check() {
+            return Err(BoardError::MoveError("Cannot castle while in check".to_string()));
+        }
+
         let king = self.piece_at(from).unwrap();
         if king.kind != PieceKind::King || king.color != self.turn {
             return Err(BoardError::MoveError("Invalid castle".to_string()));
@@ -383,6 +423,8 @@ impl Board {
             if self.is_valid_move(from, to) && self.is_valid_move(Coord {x: 7, y: from.y}, Coord { x: 5, y: from.y }) {
                 self.move_piece(from, to)?;
                 self.move_piece(Coord { x: 7, y: from.y }, Coord { x: 5, y: from.y })?;
+            } else {
+                return Err(BoardError::MoveError("Invalid castle".to_string()));
             }
 
         } else if to.x == 2 {
@@ -396,19 +438,47 @@ impl Board {
             if self.is_valid_move(from, to) && self.is_valid_move(Coord {x: 0, y: from.y}, Coord { x: 3, y: from.y }) {
                 self.move_piece(from, to)?;
                 self.move_piece(Coord { x: 0, y: from.y }, Coord { x: 3, y: from.y })?;
+            } else {
+                return Err(BoardError::MoveError("Invalid castle".to_string()));
             }
         }
 
         Ok(())
     }
 
-    fn is_castle(&self, from: Coord, to: Coord) -> bool {
+    fn is_en_passant(&self, from: Coord, to: Coord) -> bool {
         if let Some(piece) = self.piece_at(from) {
-            if piece.kind == PieceKind::King && (to.x == from.x + 2 || to.x == from.x - 2) {
-                return true;
+            if piece.kind == PieceKind::Pawn && (to.x != from.x) {
+                if let Some(en_passant) = self.en_passant {
+                    return en_passant == to;
+                }
             }
         }
         false
+    }
+
+    fn do_en_passant(&mut self, from: Coord, to: Coord) -> Result<()> {
+        let piece = self.piece_at(from).unwrap();
+        if piece.kind != PieceKind::Pawn || piece.color != self.turn {
+            return Err(BoardError::MoveError("Invalid en passant".to_string()));
+        }
+
+        if let Some(en_passant) = self.en_passant {
+            if en_passant == to && self.is_valid_move(from, to) {
+                self.move_piece(from, to)?;
+                // Remove the captured pawn in front of the en passant square
+                let captured_pawn_square = match piece.color {
+                    PieceColor::White => Coord{x: to.x, y: to.y + 1},
+                    PieceColor::Black => Coord{x: to.x, y: to.y - 1},
+                };
+                self.piece_at(captured_pawn_square).ok_or(BoardError::MoveError("Invalid en passant".to_string()))?;
+                
+                self.board[captured_pawn_square.y][captured_pawn_square.x] = Square::Empty;
+                return Ok(());
+            }
+        }
+
+        Err(BoardError::MoveError("Invalid en passant".to_string()))
     }
 
     pub fn piece_at(&self, coord: Coord) -> Option<Piece> {
@@ -453,13 +523,17 @@ impl Board {
     }
 
     pub fn list_all_valid_moves(&self) -> Vec<Move> {
+        self.list_all_valid_moves_color(self.turn)
+    }
+
+    pub fn list_all_valid_moves_color(&self, color: PieceColor) -> Vec<Move> {
         let mut moves: Vec<Move> = Vec::new();
 
         for y in 0..8 {
             for x in 0..8 {
                 let coord = Coord { x, y };
                 if let Some(piece) = self.piece_at(coord) {
-                    if piece.color == self.turn {
+                    if piece.color == color {
                         let this_piece_moves = piece.list_possible_moves(coord);
                         this_piece_moves.iter().for_each(|m| {
                             if self.is_valid_move(coord, *m) {
@@ -471,6 +545,75 @@ impl Board {
             }
         }
         moves
+    }
+
+    pub fn list_all_attacked_squares(&self) -> Vec<Coord> {
+        self.list_all_attacked_squares_color(self.turn)
+    }
+
+    pub fn list_all_attacked_squares_color(&self, color: PieceColor) -> Vec<Coord> {
+        let mut attacked_squares: Vec<Coord> = Vec::new();
+
+        for y in 0..8 {
+            for x in 0..8 {
+                let coord = Coord { x, y };
+                if let Some(piece) = self.piece_at(coord) {
+                    if piece.color == color {
+                        let this_piece_moves = piece.list_possible_moves(coord);
+                        this_piece_moves.iter().for_each(|m| {
+                            if self.can_attack_square(coord, *m) {
+                                attacked_squares.push(*m);
+                            }
+                        });
+                    }
+                }
+            }
+        }
+        attacked_squares
+    }
+
+    fn would_be_in_check(&self, from: Coord, to: Coord) -> bool {
+        let mut board = self.clone();
+        board.move_piece(from, to).unwrap();
+        board.turn = board.turn.opposite();
+        board.is_in_check(self.turn)
+    }
+
+    fn removes_check(&self, from: Coord, to: Coord) -> bool {
+        !self.would_be_in_check(from, to)
+    }
+
+    fn is_in_check(&self, color: PieceColor) -> bool {
+        let king_coord = match color {
+            PieceColor::White => self.white_king,
+            PieceColor::Black => self.black_king,
+        };
+
+        for y in 0..8 {
+            for x in 0..8 {
+                let coord = Coord { x, y };
+                if let Some(piece) = self.piece_at(coord) {
+                    if piece.color != color && self.can_attack_square(coord, king_coord) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    fn set_check(&mut self) {
+        self.in_check = match self.turn {
+            PieceColor::White => (self.is_in_check(PieceColor::White), false),
+            PieceColor::Black => (false, self.is_in_check(PieceColor::Black)),
+        };
+    }
+
+    pub fn get_check(&self) -> bool {
+        match self.turn {
+            PieceColor::White => self.in_check.0,
+            PieceColor::Black => self.in_check.1,
+        }
     }
 
 }
