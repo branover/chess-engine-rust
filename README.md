@@ -15,7 +15,7 @@ Chess engine I'm making in rust for fun to learn more about the language, chess 
 - [x] Implement en passant
 - [x] Implement looking for check (also during castling)
 - [x] Implement moves that remove check
-- [ ] Implement looking for checkmate
+- [X] Implement looking for checkmate and stalemate
 - [ ] Implement halfmove and fullmove counters
 - [ ] Create user interface for easily creating and restarting games
 - [ ] Add mouse clicking as way to move pieces

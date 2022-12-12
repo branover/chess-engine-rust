@@ -511,4 +511,34 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[test]
+    fn checkmate() {
+        let board = Board::from_fen("r1b1k1nr/ppp3pp/2np1p2/4p3/3bP3/3B1P2/PPPBNqPP/RN1QK2R w kq - 0 1").unwrap();
+        assert!(board.get_check() == true);
+        assert!(board.in_checkmate.0 == true);
+        assert!(board.get_checkmate() == true);
+    }
+
+    #[test]
+    fn checkmate_after_move() {
+        let mut board = Board::from_fen("r1b1k1nr/ppp3pp/2np1p2/4p3/3bP3/3BqP2/PPPBN1PP/RN1QK2R b kq - 0 1").unwrap();
+        assert!(board.get_check() == false);
+        board.do_move("e3", "f2").unwrap();
+
+        assert!(board.in_checkmate.0 == true);
+        assert!(board.get_checkmate() == true);
+    }
+
+    #[test]
+    fn not_checkmate() {
+        let mut board = Board::from_fen("r1b1k1nr/ppp3pp/2np1p2/4p3/3bP3/1Q1B1P2/PPPBNqPP/RN2K2R w kq - 0 1").unwrap();
+        assert!(board.get_check() == true);
+        assert!(board.in_checkmate.0 == false);
+        assert!(board.get_checkmate() == false);
+        board.do_move("e1", "d1").unwrap();
+        assert!(board.in_check.0 == false);
+        assert!(board.in_checkmate.0 == false);
+
+    }
+
 }

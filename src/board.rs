@@ -84,6 +84,8 @@ pub struct Board {
     pub white_castle: (bool, bool),
     pub black_castle: (bool, bool),
     pub in_check: (bool, bool),
+    pub in_checkmate: (bool, bool),
+    pub in_stalemate: (bool, bool),
     pub en_passant: Option<Coord>,
     pub halfmove_clock: u8,
     pub fullmove_number: u8,
@@ -99,6 +101,8 @@ impl Board {
             white_castle: (true, true),
             black_castle: (true, true),
             in_check: (false, false),
+            in_checkmate: (false, false),
+            in_stalemate: (false, false),
             en_passant: None,
             halfmove_clock: 0,
             fullmove_number: 1,
@@ -199,6 +203,8 @@ impl Board {
         board.fullmove_number = fullmove_number.parse::<u8>().map_err(|_| BoardError::ParseError("Invalid fullmove clock".to_string()))?;
 
         board.set_check();
+        board.set_checkmate();
+        board.set_stalemate();
         
         Ok(board)
     }
@@ -299,6 +305,8 @@ impl Board {
             PieceColor::Black => PieceColor::White,
         };
         self.set_check();
+        self.set_checkmate();
+        self.set_stalemate();
         Ok(())
     }
 
@@ -547,6 +555,29 @@ impl Board {
         moves
     }
 
+    pub fn has_valid_moves(&self) -> bool {
+        self.has_valid_moves_color(self.turn)
+    }
+
+    pub fn has_valid_moves_color(&self, color: PieceColor) -> bool {
+        for y in 0..8 {
+            for x in 0..8 {
+                let coord = Coord { x, y };
+                if let Some(piece) = self.piece_at(coord) {
+                    if piece.color == color {
+                        let this_piece_moves = piece.list_possible_moves(coord);
+                        for m in this_piece_moves {
+                            if self.is_valid_move(coord, m) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
     pub fn list_all_attacked_squares(&self) -> Vec<Coord> {
         self.list_all_attacked_squares_color(self.turn)
     }
@@ -613,6 +644,43 @@ impl Board {
         match self.turn {
             PieceColor::White => self.in_check.0,
             PieceColor::Black => self.in_check.1,
+        }
+    }
+
+    fn set_checkmate(&mut self) {
+        if self.in_check.0 {
+            self.in_checkmate.0 = !self.has_valid_moves_color(PieceColor::White);
+        } if self.in_check.1 {
+            self.in_checkmate.1 = !self.has_valid_moves_color(PieceColor::Black);
+        }
+    }
+
+    pub fn get_checkmate(&self) -> bool {
+        match self.turn {
+            PieceColor::White => self.in_checkmate.0,
+            PieceColor::Black => self.in_checkmate.1,
+        }
+    }
+
+    fn set_stalemate(&mut self) {
+        match self.turn {
+            PieceColor::White => {
+                if !self.in_check.0 {
+                    self.in_stalemate.0 = !self.has_valid_moves_color(PieceColor::White);
+                }
+            },
+            PieceColor::Black => {
+                if !self.in_check.1 {
+                    self.in_stalemate.1 = !self.has_valid_moves_color(PieceColor::Black);
+                }
+            }
+        }
+    }
+
+    pub fn get_stalemate(&self) -> bool {
+        match self.turn {
+            PieceColor::White => self.in_stalemate.0,
+            PieceColor::Black => self.in_stalemate.1,
         }
     }
 

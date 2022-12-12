@@ -32,6 +32,13 @@ fn main() {
                     continue;
                 }
             }
+            if b.get_checkmate() {
+                println!("Checkmate! Winner is {:?}", b.turn.opposite());
+                break;
+            } else if b.get_stalemate() {
+                println!("Stalemate!");
+                break;
+            }
         } else {
             println!("Invalid move: valid format is e2e4");
             continue;
