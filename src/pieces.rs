@@ -146,7 +146,11 @@ impl Piece {
     }
 
     fn is_valid_king_move(&self, from: Coord, to: Coord) -> bool {
-        (from.x as i32 - to.x as i32).abs() <= 1 && (from.y as i32 - to.y as i32).abs() <= 1
+        // Non-castle move
+        ((from.x as i32 - to.x as i32).abs() <= 1 && (from.y as i32 - to.y as i32).abs() <= 1) ||
+        // Castle move
+        (from.x == 4 && from.y == 0 && to.x == 6 && to.y == 0) || (from.x == 4 && from.y == 7 && to.x == 6 && to.y == 7) ||
+        (from.x == 4 && from.y == 0 && to.x == 2 && to.y == 0) || (from.x == 4 && from.y == 7 && to.x == 2 && to.y == 7)
     }
 
     pub fn list_possible_moves(&self, from: Coord) -> Vec<Coord> {
@@ -333,6 +337,14 @@ impl Piece {
                     moves.push(Coord { x: *x as usize, y: *y as usize });
                 }
             }
+        }
+        // Possible castle moves
+        if from == (Coord { x: 4, y: 0 }) {
+            moves.push(Coord { x: 6, y: 0 });
+            moves.push(Coord { x: 2, y: 0 });
+        } else if from == (Coord { x: 4, y: 7 }) {
+            moves.push(Coord { x: 6, y: 7 });
+            moves.push(Coord { x: 2, y: 7 });
         }
         moves
     }
@@ -630,5 +642,93 @@ mod tests {
         let result = board.do_move("e8", "e7");
         assert!(result.is_err());
     }
+
+    #[test]
+    fn kingside_castle() {
+        let mut board = Board::from_fen("r3kb1r/pppqpppp/2n1bn2/3p4/4P3/P2B1N1P/1PPP1PP1/RNBQK2R w KQkq - 0 1").unwrap();
+        board.do_move("e1", "g1").unwrap();
+    }
+
+    #[test]
+    fn queenside_castle() {
+        let mut board = Board::from_fen("r3kb1r/pppqpppp/2n1bn2/3p4/4P3/P2B1N1P/1PPP1PP1/RNBQK2R b KQkq - 0 1").unwrap();
+        board.do_move("e8", "c8").unwrap();
+    }
+
+    #[test]
+    fn kingside_castle_invalid() {
+        let mut board = Board::from_fen("r3kb1r/pppqpppp/2n1bn2/3p4/4P3/P2B1N1P/1PPP1PP1/RNBQK2R w Qkq - 0 1").unwrap();
+        let result = board.do_move("e1", "g1"); 
+        assert!(result.is_err()); 
+    }
+
+    #[test]
+    fn queenside_castle_invalid() {
+        let mut board = Board::from_fen("r3kb1r/pppqpppp/2n1bn2/3p4/4P3/P2B1N1P/1PPP1PP1/RNBQK2R b Qk - 0 1").unwrap();
+        let result = board.do_move("e8", "c8");   
+        assert!(result.is_err()); 
+    }
+
+    #[test]
+    fn queenside_castle_invalid_turn() {
+        let mut board = Board::from_fen("r3kb1r/pppqpppp/2n1bn2/3p4/4P3/P2B1N1P/1PPP1PP1/RNBQK2R w Qk - 0 1").unwrap();
+        let result = board.do_move("e8", "c8");   
+        assert!(result.is_err()); 
+    }
+
+    #[test]
+    fn queenside_castle_invalid_after_moving_king() {
+        let mut board = Board::from_fen("r3kb1r/pppqpppp/2n1bn2/3p4/4P3/P2B1N1P/1PPP1PP1/RNBQK2R b KQkq - 0 1").unwrap();
+        board.do_move("e8", "d8").unwrap();
+        board.do_move("g2", "g4").unwrap();
+        board.do_move("d8", "e8").unwrap();
+        board.do_move("g4", "g5").unwrap();
+        let result = board.do_move("e8", "c8");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn queenside_castle_invalid_after_moving_rook() {
+        let mut board = Board::from_fen("r3kb1r/pppqpppp/2n1bn2/3p4/4P3/P2B1N1P/1PPP1PP1/RNBQK2R b KQkq - 0 1").unwrap();
+        board.do_move("a8", "b8").unwrap();
+        board.do_move("g2", "g4").unwrap();
+        board.do_move("b8", "a8").unwrap();
+        board.do_move("g4", "g5").unwrap();
+        let result = board.do_move("e8", "c8");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn kingside_castle_invalid_after_moving_rook() {
+        let mut board = Board::from_fen("r3kb1r/pppqpppp/2n1bn2/3p4/4P3/P2B1N1P/1PPP1PP1/RNBQK2R w KQkq - 0 1").unwrap();
+        board.do_move("h1", "g1").unwrap();
+        board.do_move("g7", "g6").unwrap();
+        board.do_move("g1", "h1").unwrap();
+        board.do_move("g6", "g5").unwrap();
+        let result = board.do_move("e1", "g1"); 
+        assert!(result.is_err()); 
+    }
+
+    #[test]
+    fn kingside_castle_invalid_after_moving_king() {
+        let mut board = Board::from_fen("r3kb1r/pppqpppp/2n1bn2/3p4/4P3/P2B1N1P/1PPP1PP1/RNBQK2R w KQkq - 0 1").unwrap();
+        board.do_move("e1", "e2").unwrap();
+        board.do_move("g7", "g6").unwrap();
+        board.do_move("e2", "e1").unwrap();
+        board.do_move("g6", "g5").unwrap();
+        let result = board.do_move("e1", "g1"); 
+        assert!(result.is_err()); 
+    }
+    
+    #[test]
+    fn kingside_castle_after_moving_queenside_rook() {
+        let mut board = Board::from_fen("r3kb1r/pppqpppp/2n1bn2/3p4/4P3/P2B1N1P/1PPP1PP1/RNBQK2R w KQkq - 0 1").unwrap();
+        board.do_move("a1", "a2").unwrap();
+        board.do_move("g7", "g6").unwrap();
+        board.do_move("g2", "g3").unwrap();
+        board.do_move("g6", "g5").unwrap();
+        board.do_move("e1", "g1").unwrap();
+    }
+    
 
 }

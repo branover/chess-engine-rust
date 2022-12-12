@@ -74,11 +74,6 @@ impl Coord {
 
         let x = x as u8 - 97;
         let y = 7 - (y as u8 - 49);
-        // println!("{} -> ({}, {})", notation, x, y);
-
-        if x > 7 || y > 7 {
-            return Err(BoardError::ParseError("Invalid notation".to_string()));
-        }
         Ok(Coord { x: x as usize, y: y as usize })
     }
 
@@ -89,7 +84,7 @@ impl Coord {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct Board {
     pub board: [[Square; 8]; 8],
     pub turn: PieceColor,
@@ -180,15 +175,23 @@ impl Board {
         let castle = fen.next().ok_or(BoardError::ParseError("Invalid length of FEN".to_string()))?;
         if castle.contains('K') {
             board.white_castle.0 = true;
+        } else {
+            board.white_castle.0 = false;
         }
         if castle.contains('Q') {
             board.white_castle.1 = true;
+        } else {
+            board.white_castle.1 = false;
         }
         if castle.contains('k') {
             board.black_castle.0 = true;
+        } else {
+            board.black_castle.0 = false;
         }
         if castle.contains('q') {
             board.black_castle.1 = true;
+        } else {
+            board.black_castle.1 = false;
         }
 
         let en_passant = fen.next().ok_or(BoardError::ParseError("Invalid length of FEN".to_string()))?;
@@ -241,22 +244,51 @@ impl Board {
         if let Square::Occupied(piece) = piece {
             self.board[from.y][from.x] = Square::Empty;
             self.board[to.y][to.x] = Square::Occupied(piece);
+
+            // Remove ability to castle based on moved piece
+            if piece.kind == PieceKind::King {
+                if piece.color == PieceColor::White {
+                    self.white_castle = (false, false);
+                } else {
+                    self.black_castle = (false, false);
+                }
+            } else if piece.kind == PieceKind::Rook {
+                if piece.color == PieceColor::White {
+                    if from.x == 0 {
+                        self.white_castle.1 = false;
+                    } else if from.x == 7 {
+                        self.white_castle.0 = false;
+                    }
+                } else {
+                    if from.x == 0 {
+                        self.black_castle.1 = false;
+                    } else if from.x == 7 {
+                        self.black_castle.0 = false;
+                    }
+                }
+            }
+
             Ok(())
         } else {
             Err(BoardError::MoveError("No piece to move".to_string()))
-        }
+        }        
     }
 
     pub fn do_move(&mut self, from: &str, to: &str) -> Result<()> {
-        self.do_move_coord(Coord::from_notation(from)?, Coord::from_notation(to)?)
+        self.do_move_from_coord(Coord::from_notation(from)?, Coord::from_notation(to)?)
     }
 
-    pub fn do_move_coord(&mut self, from: Coord, to: Coord) -> Result<()> {
-        if !self.is_valid_move(from, to) {
-            return Err(BoardError::MoveError(format!("Invalid move from {} to {}", from.to_notation(), to.to_notation())));
-        }
+    pub fn do_move_from_coord(&mut self, from: Coord, to: Coord) -> Result<()> {
+        if self.is_castle(from, to) {
+            self.do_castle(from, to)?;
+        } else {
+            if !self.is_valid_move(from, to) {
+                return Err(BoardError::MoveError(format!("Invalid move from {} to {}", from.to_notation(), to.to_notation())));
+            }
 
-        self.move_piece(from, to)?;    
+            self.move_piece(from, to)?; 
+        }
+   
         self.turn = match self.turn {
             PieceColor::White => PieceColor::Black,
             PieceColor::Black => PieceColor::White,
@@ -306,6 +338,70 @@ impl Board {
         }
 
         true
+    }
+
+    fn do_castle(&mut self, from: Coord, to: Coord) -> Result<()> {
+        let king = self.piece_at(from).unwrap();
+        if king.kind != PieceKind::King || king.color != self.turn {
+            return Err(BoardError::MoveError("Invalid castle".to_string()));
+        }
+        let rook_square = if to.x == from.x + 2 {
+            self.board[from.y][7]
+        } else {
+            self.board[from.y][0]
+        };
+
+
+        let rook = if let Square::Occupied(rook) = rook_square {
+            if rook.kind != PieceKind::Rook {
+                return Err(BoardError::MoveError("Invalid castle".to_string()));
+            }
+            rook
+        } else {
+            return Err(BoardError::MoveError("Invalid castle".to_string()));
+        };
+
+        if king.color != rook.color {
+            return Err(BoardError::MoveError("Invalid castle".to_string()));
+        }
+
+        if to.x == 6 {
+            // Kingside castle
+            if !match king.color {
+                PieceColor::White => self.white_castle.0,
+                PieceColor::Black => self.black_castle.0,
+            } {
+                return Err(BoardError::MoveError("Can't kingside castle".to_string()));
+            }
+            if self.is_valid_move(from, to) && self.is_valid_move(Coord {x: 7, y: from.y}, Coord { x: 5, y: from.y }) {
+                self.move_piece(from, to)?;
+                self.move_piece(Coord { x: 7, y: from.y }, Coord { x: 5, y: from.y })?;
+            }
+
+        } else if to.x == 2 {
+            // Queenside castle
+            if !match king.color {
+                PieceColor::White => self.white_castle.1,
+                PieceColor::Black => self.black_castle.1,
+            } {
+                return Err(BoardError::MoveError("Can't queenside castle".to_string()));
+            }
+            if self.is_valid_move(from, to) && self.is_valid_move(Coord {x: 0, y: from.y}, Coord { x: 3, y: from.y }) {
+                self.move_piece(from, to)?;
+                self.move_piece(Coord { x: 0, y: from.y }, Coord { x: 3, y: from.y })?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn is_castle(&self, from: Coord, to: Coord) -> bool {
+        if let Some(piece) = self.piece_at(from) {
+            if piece.kind == PieceKind::King && (to.x == from.x + 2 || to.x == from.x - 2) {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn piece_at(&self, coord: Coord) -> Option<Piece> {
@@ -371,6 +467,24 @@ mod tests {
         let fen_board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1").unwrap();
 
         assert!(fen_board.turn == PieceColor::Black);
+    }
+
+    #[test]
+    fn test_notation() {
+        let from = "a3";
+        assert!(Coord::from_notation(from).unwrap() == Coord { x: 0, y: 5 });
+
+        let from = "h8";
+        assert!(Coord::from_notation(from).unwrap() == Coord { x: 7, y: 0 });
+    }
+
+    #[test]
+    fn test_notation_invalid() {
+        let from = "i3";
+        assert!(Coord::from_notation(from).is_err());
+
+        let from = "a9";
+        assert!(Coord::from_notation(from).is_err());
     }
 
    
