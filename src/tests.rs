@@ -14,6 +14,7 @@ mod tests {
         PieceColor,
         PieceKind,
     };
+    use crate::engine::make_best_move;
 
 
     #[bench]
@@ -533,6 +534,15 @@ mod tests {
         assert!(board.in_check.0 == false);
         assert!(board.in_checkmate.0 == false);
 
+    }
+
+    #[test]
+    fn engine() {
+        let mut board = Board::default();
+        for _ in 0..10 {
+            let mv = make_best_move(2, &mut board).unwrap();
+            board.do_move_from_coord(mv.from, mv.to).unwrap();
+        }
     }
 
 }

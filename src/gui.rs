@@ -1,6 +1,7 @@
 use iced::{button, container, Container, Align, Length, HorizontalAlignment, VerticalAlignment, Background, Button, Row, Column, Element, Sandbox, Settings, Text};
 use rand::{thread_rng, seq::SliceRandom};
 
+
 use lazy_static::lazy_static;
 
 use std::sync::Mutex;
@@ -13,6 +14,9 @@ use crate::pieces::{
     Piece,
     PieceColor,
     PieceKind
+};
+use crate::engine::{
+    make_best_move
 };
 
 
@@ -66,7 +70,8 @@ pub fn get_symbol(piece: &Piece) -> impl ToString {
 
 pub fn best_move(board: &Board) -> Move {
     // board.get_best_next_move(AI_DEPTH).0
-    Move{from: Coord {x:0, y:0} , to: Coord {x:0, y:1}, promote: None}
+    // Move{from: Coord {x:0, y:0} , to: Coord {x:0, y:1}, promote: None}
+    make_best_move(2, board).unwrap()
 }
 
 // pub fn worst_move(board: &Board) -> Move {
@@ -280,9 +285,30 @@ impl Sandbox for ChessBoard {
                                     GameResult::Continuing
                                 }
                             },
-                            Err(e) => GameResult::IllegalMove(m)
+                            Err(_) => GameResult::IllegalMove(m)
                         };
-                    }
+                        match self.result {
+                            GameResult::Continuing => {
+                                let cpu_move = (self.get_cpu_move)(&self.board);
+                                self.result = match self.board.do_move_from_coord(cpu_move.from, cpu_move.to) {
+                                    Ok(_) => {
+                                        if self.board.get_checkmate() {
+                                            GameResult::Victory(self.board.turn)
+                                        } else if self.board.get_stalemate() {
+                                            GameResult::Stalemate
+                                        } else {
+                                            GameResult::Continuing
+                                        }
+                                    },
+                                    Err(e) => GameResult::IllegalMove(cpu_move)
+                                };
+                            },
+                            GameResult::Victory(_) | GameResult::Stalemate => {
+                                self.board = self.starting_board;
+                            }
+                            _ => {}
+                        }
+                    },
                     (Some(_), Message::SelectSquare(to)) => {
                         self.from_square = Some(to);
                     }

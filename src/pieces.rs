@@ -128,8 +128,18 @@ impl Piece {
         }
 
         match self.color {
-            PieceColor::Black => to.y == from.y + 1,
-            PieceColor::White => to.y == from.y - 1,
+            PieceColor::Black => {
+                if from.y == 7 {
+                    return false;
+                }
+                to.y == from.y + 1
+            },
+            PieceColor::White => {
+                if from.y == 0 {
+                    return false;
+                }
+                to.y == from.y - 1
+            }
         }
     }
 

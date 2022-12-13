@@ -13,7 +13,7 @@ pub enum BoardError {
     ParseError(String),
     MoveError(String),
 }
-type Result<T> = std::result::Result<T, BoardError>;
+pub type Result<T> = std::result::Result<T, BoardError>;
 
 impl std::error::Error for BoardError {}
 
@@ -247,6 +247,10 @@ impl Board {
                     // Set en passant square
                     if (from.y as i8 - to.y as i8).abs() == 2 {
                         self.en_passant = Some(Coord{x: from.x, y: (from.y + to.y) / 2});
+                    } else if piece.color == PieceColor::White && to.y == 0 {
+                        self.board[to.y][to.x] = Square::Occupied(Piece::queen(PieceColor::White));
+                    } else if piece.color == PieceColor::Black && to.y == 7 {
+                        self.board[to.y][to.x] = Square::Occupied(Piece::queen(PieceColor::Black));
                     }
                 },
                 PieceKind::King => {
@@ -659,17 +663,22 @@ impl Board {
     }
 
     pub fn check_end_conditions(&mut self) {
-        if !self.has_valid_moves_color(PieceColor::White) {
-            if self.in_check.0 {
-                self.in_checkmate.0 = true;
-            } else if self.turn == PieceColor::White {
-                self.in_stalemate.0 = true;
-            }
-        } else if !self.has_valid_moves_color(PieceColor::Black) {
-            if self.in_check.1 {
-                self.in_checkmate.1 = true;
-            } else if self.turn == PieceColor::Black {
-                self.in_stalemate.1 = true;
+        if !self.has_valid_moves_color(self.turn) {
+            match self.turn {
+                PieceColor::White => {
+                    if self.in_check.0 {
+                        self.in_checkmate.0 = true;
+                    } else {
+                        self.in_stalemate.0 = true;
+                    }
+                }
+                PieceColor::Black => {
+                    if self.in_check.1 {
+                        self.in_checkmate.1 = true;
+                    } else {
+                        self.in_stalemate.1 = true;
+                    }
+                }
             }
         }
     }
