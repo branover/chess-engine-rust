@@ -1,7 +1,9 @@
 use crate::board::Coord;
+use std::fmt::Display;
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
 pub enum PieceColor {
+    #[default]
     White,
     Black,
 }
@@ -11,6 +13,15 @@ impl PieceColor {
         match self {
             PieceColor::White => PieceColor::Black,
             PieceColor::Black => PieceColor::White,
+        }
+    }
+}
+
+impl Display for PieceColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PieceColor::White => write!(f, "White"),
+            PieceColor::Black => write!(f, "Black"),
         }
     }
 }

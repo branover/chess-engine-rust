@@ -6,8 +6,23 @@ fn test_all_possible_moves() {
     board.list_all_valid_moves();
 }
 
+pub fn queen_capture() {
+    let mut board = Board::default();
+    let moves = [
+        ("d2", "d4"),
+        ("e7", "e5"),
+        ("d1", "d3"),
+        ("e5", "d4"),
+        ("d3", "d4"),
+    ];
+    for (from, to) in moves.iter() {
+        board.do_move(from, to).unwrap();
+    }
+}
+
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("all_possible_moves", |b| b.iter(|| test_all_possible_moves()));
+    c.bench_function("queen_capture", |b| b.iter(|| queen_capture()));
 }
 
 criterion_group!(benches, criterion_benchmark);

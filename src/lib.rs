@@ -2,4 +2,6 @@
 
 pub mod board;
 pub mod pieces;
-pub mod test;
+pub mod tests;
+pub mod gui;
+

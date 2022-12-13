@@ -25,14 +25,17 @@ mod tests {
         // println!("{:?}", result);
     }
 
+    #[bench]
+    fn queen_capture_bench(b: &mut Bencher) {
+        b.iter(|| {
+            queen_capture()
+        });
+    }
+
     #[test]
     fn board_builder() {
         let fen_board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
         let default_board: Board = Board::default();
-
-        fen_board.pretty_print_board();
-        default_board.pretty_print_board();
-
         assert!(default_board == fen_board)
     }
 
@@ -85,7 +88,6 @@ mod tests {
         ];
         for (from, to) in moves.iter() {
             board.do_move(from, to).unwrap();
-            board.pretty_print_board();
         }
     }
 
@@ -116,7 +118,6 @@ mod tests {
         ];
         for (from, to) in moves.iter() {
             board.do_move(from, to).unwrap();
-            board.pretty_print_board();
         }
     }
 
@@ -147,7 +148,6 @@ mod tests {
         ];
         for (from, to) in moves.iter() {
             board.do_move(from, to).unwrap();
-            board.pretty_print_board();
         }
     }
 
@@ -183,7 +183,6 @@ mod tests {
         ];
         for (from, to) in moves.iter() {
             board.do_move(from, to).unwrap();
-            board.pretty_print_board();
         }
     }
 
@@ -218,7 +217,6 @@ mod tests {
         ];
         for (from, to) in moves.iter() {
             board.do_move(from, to).unwrap();
-            board.pretty_print_board();
         }
     }
 
@@ -241,7 +239,6 @@ mod tests {
         // Get pawn out of the way
         board.do_move("e2", "e4").unwrap();
 
-
         let moves = [
             ("e7", "e6"),
             ("e1", "e2"),
@@ -254,7 +251,6 @@ mod tests {
         ];
         for (from, to) in moves.iter() {
             board.do_move(from, to).unwrap();
-            board.pretty_print_board();
         }
     }
 
@@ -282,7 +278,6 @@ mod tests {
         ];
         for (from, to) in moves.iter() {
             board.do_move(from, to).unwrap();
-            board.pretty_print_board();
         }
     }
 
@@ -507,7 +502,6 @@ mod tests {
         let mut board = Board::from_fen("r1bqk1nr/ppp3pp/2np1p2/4p3/3bP3/3B1P2/PPP1N1PP/RNBQK2R w KQkq - 0 1").unwrap();
         assert!(board.get_check() == false);
         let result = board.do_move("e1", "g1");
-        board.pretty_print_board();
         assert!(result.is_err());
     }
 

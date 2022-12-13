@@ -7,6 +7,9 @@ edition = "2021"
 
 [dependencies]
 colored = "2.0.0"
+iced = { version = "0.2", default-features = false, features = ["glow"] }
+rand = "0.8"
+lazy_static = "1.4"
 
 [dev-dependencies]
 criterion = "0.4"

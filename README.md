@@ -21,7 +21,7 @@ Chess engine I'm making in rust for fun to learn more about the language, chess 
 - [ ] Add mouse clicking as way to move pieces
 - [ ] Add ability to import a game based on algebraic notation
 - [ ] Add images/graphics for pieces instead of unicode
-- [ ] Add win checking
+- [x] Add win checking
 - [ ] Add draw/stalemate checking
 - [ ] Add basic CPU bot that makes random valid moves
 - [ ] Add more advanced CPU bot that looks for "good" moves

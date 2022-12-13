@@ -6,6 +6,7 @@ use crate::pieces::{
 
 use std::fmt;
 use colored::*;
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub enum BoardError {
@@ -40,7 +41,7 @@ impl Square {
     }  
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
 pub struct Coord {
     pub x: usize,
     pub y: usize,
@@ -68,14 +69,14 @@ impl Coord {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Move {
     pub from: Coord,
     pub to: Coord,
     pub promote: Option<PieceKind>,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub struct Board {
     pub board: [[Square; 8]; 8],
     pub turn: PieceColor,
@@ -203,9 +204,7 @@ impl Board {
         board.fullmove_number = fullmove_number.parse::<u8>().map_err(|_| BoardError::ParseError("Invalid fullmove clock".to_string()))?;
 
         board.set_check();
-        board.set_checkmate();
-        board.set_stalemate();
-        
+        board.check_end_conditions();
         Ok(board)
     }
 
@@ -299,15 +298,14 @@ impl Board {
             }
             self.move_piece(from, to)?; 
         }
-   
-        self.turn = match self.turn {
-            PieceColor::White => PieceColor::Black,
-            PieceColor::Black => PieceColor::White,
-        };
-        self.set_check();
-        self.set_checkmate();
-        self.set_stalemate();
+        self.end_turn();
         Ok(())
+    }
+
+    fn end_turn(&mut self) {
+        self.turn = self.turn.opposite();
+        self.set_check();
+        self.check_end_conditions();
     }
 
     pub fn parse_move(&self, notation: &str) -> Result<(String, String)> {
@@ -329,6 +327,7 @@ impl Board {
             return false;
         }
 
+        // Must be moving to a square that the piece can attack (with exceptions)
         if !self.can_attack_square(from, to) {
             return false
         }
@@ -338,6 +337,7 @@ impl Board {
             return false;
         }
 
+        // If the player is not in check, they must not move into check
         if self.would_be_in_check(from, to) {
             return false;
         }
@@ -384,7 +384,7 @@ impl Board {
 
     fn is_castle(&self, from: Coord, to: Coord) -> bool {
         if let Some(piece) = self.piece_at(from) {
-            if piece.kind == PieceKind::King && (to.x == from.x + 2 || to.x == from.x - 2) {
+            if piece.kind == PieceKind::King && (from.x == 4) && (to.x == 6 || to.x == 2) {
                 return true;
             }
         }
@@ -500,24 +500,21 @@ impl Board {
         let mut x: i32 = from.x as i32;
         let mut y: i32 = from.y as i32;
 
-        let mut x_dir: i32;
-        let mut y_dir: i32;
-
-        if from.x < to.x {
-            x_dir = 1;
+        let x_dir = if from.x < to.x {
+            1
         } else if from.x > to.x {
-            x_dir = -1;
+            -1
         } else {
-            x_dir = 0;
-        }
+            0
+        };
 
-        if from.y < to.y {
-            y_dir = 1;
+        let y_dir = if from.y < to.y {
+            1
         } else if from.y > to.y {
-            y_dir = -1;
+            -1
         } else {
-            y_dir = 0;
-        }
+            0
+        };
 
         while x != to.x as i32 || y != to.y as i32 {
             x += x_dir;
@@ -578,12 +575,12 @@ impl Board {
         false
     }
 
-    pub fn list_all_attacked_squares(&self) -> Vec<Coord> {
+    pub fn list_all_attacked_squares(&self) -> HashSet<Coord> {
         self.list_all_attacked_squares_color(self.turn)
     }
 
-    pub fn list_all_attacked_squares_color(&self, color: PieceColor) -> Vec<Coord> {
-        let mut attacked_squares: Vec<Coord> = Vec::new();
+    pub fn list_all_attacked_squares_color(&self, color: PieceColor) -> HashSet<Coord> {
+        let mut attacked_squares: HashSet<Coord> = HashSet::new();
 
         for y in 0..8 {
             for x in 0..8 {
@@ -593,7 +590,7 @@ impl Board {
                         let this_piece_moves = piece.list_possible_moves(coord);
                         this_piece_moves.iter().for_each(|m| {
                             if self.can_attack_square(coord, *m) {
-                                attacked_squares.push(*m);
+                                attacked_squares.insert(*m);
                             }
                         });
                     }
@@ -647,14 +644,6 @@ impl Board {
         }
     }
 
-    fn set_checkmate(&mut self) {
-        if self.in_check.0 {
-            self.in_checkmate.0 = !self.has_valid_moves_color(PieceColor::White);
-        } if self.in_check.1 {
-            self.in_checkmate.1 = !self.has_valid_moves_color(PieceColor::Black);
-        }
-    }
-
     pub fn get_checkmate(&self) -> bool {
         match self.turn {
             PieceColor::White => self.in_checkmate.0,
@@ -662,25 +651,26 @@ impl Board {
         }
     }
 
-    fn set_stalemate(&mut self) {
-        match self.turn {
-            PieceColor::White => {
-                if !self.in_check.0 {
-                    self.in_stalemate.0 = !self.has_valid_moves_color(PieceColor::White);
-                }
-            },
-            PieceColor::Black => {
-                if !self.in_check.1 {
-                    self.in_stalemate.1 = !self.has_valid_moves_color(PieceColor::Black);
-                }
-            }
-        }
-    }
-
     pub fn get_stalemate(&self) -> bool {
         match self.turn {
             PieceColor::White => self.in_stalemate.0,
             PieceColor::Black => self.in_stalemate.1,
+        }
+    }
+
+    pub fn check_end_conditions(&mut self) {
+        if !self.has_valid_moves_color(PieceColor::White) {
+            if self.in_check.0 {
+                self.in_checkmate.0 = true;
+            } else if self.turn == PieceColor::White {
+                self.in_stalemate.0 = true;
+            }
+        } else if !self.has_valid_moves_color(PieceColor::Black) {
+            if self.in_check.1 {
+                self.in_checkmate.1 = true;
+            } else if self.turn == PieceColor::Black {
+                self.in_stalemate.1 = true;
+            }
         }
     }
 
