@@ -351,7 +351,7 @@ impl Board {
     }
 
     #[inline]
-    fn can_attack_square(&self, from: Coord, to: Coord) -> bool {
+    pub fn can_attack_square(&self, from: Coord, to: Coord) -> bool {
         let piece = match self.piece_at(from) {
             Some(piece) => piece,
             _ => return false,
@@ -576,32 +576,6 @@ impl Board {
             }
         }
         false
-    }
-
-    #[inline]
-    pub fn list_all_attacked_squares(&self) -> FxHashSet<Coord> {
-        self.list_all_attacked_squares_color(self.turn)
-    }
-
-    pub fn list_all_attacked_squares_color(&self, color: PieceColor) -> FxHashSet<Coord> {
-        let mut attacked_squares: FxHashSet<Coord> = FxHashSet::default();
-
-        for y in 0..8 {
-            for x in 0..8 {
-                let coord = Coord { x, y };
-                if let Some(piece) = self.piece_at(coord) {
-                    if piece.color == color {
-                        let this_piece_moves = piece.list_possible_moves(coord);
-                        for m in this_piece_moves {
-                            if self.can_attack_square(coord, m) {
-                                attacked_squares.insert(m);
-                            } 
-                        }
-                    }
-                }
-            }
-        }
-        attacked_squares
     }
 
     fn would_be_in_check(&self, from: Coord, to: Coord) -> bool {

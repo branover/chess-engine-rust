@@ -17,7 +17,7 @@ fn piece_score(piece: PieceKind) -> i32 {
         PieceKind::Bishop => 300,
         PieceKind::Rook => 500,
         PieceKind::Queen => 900,
-        PieceKind::King => 10000,
+        PieceKind::King => 2000,
     }
 }
 
@@ -170,28 +170,36 @@ fn eval_position(board: &Board, color: PieceColor) -> i32 {
             }
         }
     };
-    calculate_material(board, color) + eval_side(board, color) - eval_side(board, color.opposite())
+    calculate_material(board, color) + calc_attack_defend_score(board, color)
 }
 
-#[inline]
-fn eval_side(board: &Board, color: PieceColor) -> i32 {
+pub fn calc_attack_defend_score(board: &Board, color: PieceColor) -> i32 {
     let mut score = 0;
-    let attacked_squares = board.list_all_attacked_squares_color(color);
-    attacked_squares.iter().for_each(|coord| {
-        if let Some(piece) = board.piece_at(*coord) {
-            // Piece is defended
-            if piece.color == color {
-                score += piece_score(piece.kind) / 10;
-            } 
-            // Piece is attacked
-            else {
-                score += piece_score(piece.kind) / 5;
+
+    for y in 0..8 {
+        for x in 0..8 {
+            let coord = Coord { x, y };
+            if let Some(piece) = board.piece_at(coord) {
+                let this_piece_moves = piece.list_possible_moves(coord);
+                for m in this_piece_moves {
+                    if board.can_attack_square(coord, m) {
+                        if let Some(piece) = board.piece_at(m) {
+                            if piece.color == color {
+                                // Piece is defended
+                                score += piece_score(piece.kind) / 10;
+                            } else {
+                                // Piece is attacked
+                                score += piece_score(piece.kind) / 5;
+                            }
+                        } else {
+                            // Empty square is attacked
+                            score += 10;
+                        }
+                    } 
+                }
+                
             }
-        } else {
-            // Empty square is attacked
-            score += 10;
         }
-    });
-    
+    }
     score
 }
