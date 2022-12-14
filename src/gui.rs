@@ -47,7 +47,9 @@ lazy_static! {
 }
 
 const SQUARE_SIZE: u16 = 48;
-pub const AI_DEPTH: i32 = if cfg!(debug_assertions) {2} else {4};
+// pub const AI_DEPTH: i32 = if cfg!(debug_assertions) {2} else {4};
+pub const AI_DEPTH: u8 = 6;
+
 
 pub fn get_symbol(piece: &Piece) -> impl ToString {
 	// match piece.kind {
@@ -71,7 +73,7 @@ pub fn get_symbol(piece: &Piece) -> impl ToString {
 pub fn best_move(board: &Board) -> Move {
     // board.get_best_next_move(AI_DEPTH).0
     // Move{from: Coord {x:0, y:0} , to: Coord {x:0, y:1}, promote: None}
-    make_best_move(2, board).unwrap()
+    make_best_move(AI_DEPTH, *board).unwrap()
 }
 
 // pub fn worst_move(board: &Board) -> Move {
@@ -157,13 +159,12 @@ impl ChessSquare {
             } else {
                 LIGHT_SQUARE
             }
+        } else if is_selected {
+            SELECTED_DARK_SQUARE
         } else {
-            if is_selected {
-                SELECTED_DARK_SQUARE
-            } else {
-                DARK_SQUARE
-            }
+            DARK_SQUARE
         }
+
     }
 
     fn get_text_color(&self) -> iced::Color {
@@ -300,7 +301,7 @@ impl Sandbox for ChessBoard {
                                             GameResult::Continuing
                                         }
                                     },
-                                    Err(e) => GameResult::IllegalMove(cpu_move)
+                                    Err(_) => GameResult::IllegalMove(cpu_move)
                                 };
                             },
                             GameResult::Victory(_) | GameResult::Stalemate => {

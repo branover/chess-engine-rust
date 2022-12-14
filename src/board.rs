@@ -4,9 +4,10 @@ use crate::pieces::{
     PieceKind,
 };
 
-use std::fmt;
+use std::{fmt, cmp::Ordering};
 use colored::*;
-use std::collections::HashSet;
+// use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 
 #[derive(Debug)]
 pub enum BoardError {
@@ -19,9 +20,9 @@ impl std::error::Error for BoardError {}
 
 impl fmt::Display for BoardError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &*self {
-            BoardError::ParseError(desc) => write!(f, "Error parsing input: {}", desc),
-            BoardError::MoveError(desc) => write!(f, "Error making move: {}", desc),
+        match self {
+            BoardError::ParseError(desc) => write!(f, "Error parsing input: {desc}"),
+            BoardError::MoveError(desc) => write!(f, "Error making move: {desc}"),
         }
     }
 }
@@ -65,7 +66,7 @@ impl Coord {
     pub fn to_notation(self) -> String {
         let x = (self.x as u8 + 97) as char;
         let y = (7 - self.y as u8 + 49) as char;
-        format!("{}{}", x, y)
+        format!("{x}{y}")
     }
 }
 
@@ -225,7 +226,7 @@ impl Board {
                     cell.on_truecolor(205, 170, 125)
                 };
 
-                print!("{}", cell);
+                print!("{cell}");
             }
             println!(" {}", 8 - i);
         }
@@ -271,12 +272,10 @@ impl Board {
                         } else if from.x == 7 {
                             self.white_castle.0 = false;
                         }
-                    } else {
-                        if from.x == 0 {
-                            self.black_castle.1 = false;
-                        } else if from.x == 7 {
-                            self.black_castle.0 = false;
-                        }
+                    } else if from.x == 0 {
+                        self.black_castle.1 = false;
+                    } else if from.x == 7 {
+                        self.black_castle.0 = false;
                     }
                 },
                 _ => {}
@@ -306,6 +305,7 @@ impl Board {
         Ok(())
     }
 
+    #[inline]
     fn end_turn(&mut self) {
         self.turn = self.turn.opposite();
         self.set_check();
@@ -320,6 +320,7 @@ impl Board {
         Ok((from, to))
     }
 
+    #[inline]
     pub fn is_valid_move(&self, from: Coord, to: Coord) -> bool {
         let piece = match self.piece_at(from) {
             Some(piece) => piece,
@@ -349,6 +350,7 @@ impl Board {
         true
     }
 
+    #[inline]
     fn can_attack_square(&self, from: Coord, to: Coord) -> bool {
         let piece = match self.piece_at(from) {
             Some(piece) => piece,
@@ -493,6 +495,7 @@ impl Board {
         Err(BoardError::MoveError("Invalid en passant".to_string()))
     }
 
+    #[inline]
     pub fn piece_at(&self, coord: Coord) -> Option<Piece> {
         match self.board[coord.y][coord.x] {
             Square::Occupied(piece) => Some(piece),
@@ -504,20 +507,16 @@ impl Board {
         let mut x: i32 = from.x as i32;
         let mut y: i32 = from.y as i32;
 
-        let x_dir = if from.x < to.x {
-            1
-        } else if from.x > to.x {
-            -1
-        } else {
-            0
+        let x_dir = match from.x.cmp(&to.x) {
+            Ordering::Less => 1,
+            Ordering::Greater => -1,
+            Ordering::Equal => 0,
         };
 
-        let y_dir = if from.y < to.y {
-            1
-        } else if from.y > to.y {
-            -1
-        } else {
-            0
+        let y_dir = match from.y.cmp(&to.y) {
+            Ordering::Less => 1,
+            Ordering::Greater => -1,
+            Ordering::Equal => 0,
         };
 
         while x != to.x as i32 || y != to.y as i32 {
@@ -579,12 +578,13 @@ impl Board {
         false
     }
 
-    pub fn list_all_attacked_squares(&self) -> HashSet<Coord> {
+    #[inline]
+    pub fn list_all_attacked_squares(&self) -> FxHashSet<Coord> {
         self.list_all_attacked_squares_color(self.turn)
     }
 
-    pub fn list_all_attacked_squares_color(&self, color: PieceColor) -> HashSet<Coord> {
-        let mut attacked_squares: HashSet<Coord> = HashSet::new();
+    pub fn list_all_attacked_squares_color(&self, color: PieceColor) -> FxHashSet<Coord> {
+        let mut attacked_squares: FxHashSet<Coord> = FxHashSet::default();
 
         for y in 0..8 {
             for x in 0..8 {
@@ -592,11 +592,11 @@ impl Board {
                 if let Some(piece) = self.piece_at(coord) {
                     if piece.color == color {
                         let this_piece_moves = piece.list_possible_moves(coord);
-                        this_piece_moves.iter().for_each(|m| {
-                            if self.can_attack_square(coord, *m) {
-                                attacked_squares.insert(*m);
-                            }
-                        });
+                        for m in this_piece_moves {
+                            if self.can_attack_square(coord, m) {
+                                attacked_squares.insert(m);
+                            } 
+                        }
                     }
                 }
             }
@@ -605,7 +605,7 @@ impl Board {
     }
 
     fn would_be_in_check(&self, from: Coord, to: Coord) -> bool {
-        let mut board = self.clone();
+        let mut board = *self;
         board.move_piece(from, to).unwrap();
         board.turn = board.turn.opposite();
         board.is_in_check(self.turn)

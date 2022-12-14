@@ -174,6 +174,7 @@ impl Piece {
         (from.x == 4 && from.y == 0 && to.x == 2 && to.y == 0) || (from.x == 4 && from.y == 7 && to.x == 2 && to.y == 7)
     }
 
+    #[inline]
     pub fn list_possible_moves(&self, from: Coord) -> Vec<Coord> {
         match self.kind {
             Pawn => self.list_possible_pawn_moves(from),
@@ -186,7 +187,7 @@ impl Piece {
     }
 
     fn list_possible_pawn_moves(&self, from: Coord) -> Vec<Coord> {
-        let mut moves = Vec::new();
+        let mut moves = Vec::with_capacity(4);
         let mut to_x: i32 = from.x as i32;
         let mut to_y: i32 = from.y as i32;
         match self.color {
@@ -240,7 +241,7 @@ impl Piece {
     }
 
     fn list_possible_knight_moves(&self, from: Coord) -> Vec<Coord> {
-        let mut moves = Vec::new();
+        let mut moves = Vec::with_capacity(8);
         let mut to_x: i32 = from.x as i32 + 2;
         let mut to_y: i32 = from.y as i32 + 1;
         if to_x < 8 && to_y < 8 {

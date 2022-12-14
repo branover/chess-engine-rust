@@ -21,10 +21,10 @@ pub fn queen_capture() {
     }
 }
 
-pub fn engine() {
+pub fn engine(depth: u8, moves: u8) {
     let mut board = Board::default();
-    for i in 0..10 {
-        let mv = make_best_move(2, &mut board).unwrap();
+    for _ in 0..moves {
+        let mv = make_best_move(depth, board).unwrap();
         board.do_move_from_coord(mv.from, mv.to).unwrap();
     }
 }
@@ -35,7 +35,9 @@ fn criterion_benchmark(c: &mut Criterion) {
 }
 
 fn engine_benchmark(c: &mut Criterion) {
-    c.bench_function("engine_d2_10mv", |b| b.iter(|| engine()));
+    c.bench_function("engine_d2_5mv", |b| b.iter(|| engine(2, 5)));
+    // c.bench_function("engine_d3_5mv", |b| b.iter(|| engine(3, 5)));
+
 }
 
 criterion_group!(benches, criterion_benchmark, engine_benchmark);

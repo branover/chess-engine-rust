@@ -49,7 +49,7 @@ use chess_engine::{
 // }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut b = Board::default();
+    let b = Board::default();
 
     // run(random_move, b)?;
     run(best_move, b)?;
