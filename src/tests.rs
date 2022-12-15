@@ -545,4 +545,44 @@ mod tests {
         }
     }
 
+    #[test]
+    fn engine_find_mate_in_one() {
+        let mut board = Board::from_fen("rnbqkb1r/1ppp1ppp/p4n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 0 1").unwrap();
+        let mv = make_best_move(4, &board).unwrap();
+        board.do_move_from_coord(mv).unwrap();
+        assert!(board.in_checkmate.1 == true);
+    }
+
+    #[test]
+    fn engine_find_mate_in_two() {
+        let mut board = Board::from_fen("r3r1k1/5ppp/2Q5/2pP4/1P6/2P2N2/P2P1PPP/R3R1K1 w - - 0 1").unwrap();
+        for _ in 0..3 {
+            let mv = make_best_move(3, &board).unwrap();
+            board.do_move_from_coord(mv).unwrap();
+        }
+        assert!(board.in_checkmate.1 == true); 
+    }
+
+    #[test]
+    fn engine_avoid_blundering_queen() {
+        let mut board = Board::from_fen("rnb1kbnr/ppp1pppp/8/1q1p4/4P3/2N2N2/PPPP1PPP/R1BQKB1R b KQkq - 3 3").unwrap();
+        
+        let mv = make_best_move(3, &board).unwrap();
+        assert!(mv.from == Coord{x: 1, y: 3} );
+        board.do_move_from_coord(mv).unwrap();
+    }
+
+    #[test]
+    fn engine_find_queen_king_fork() {
+        let mut board = Board::from_fen("r4k1r/bp2pppp/n1p5/1bqpN3/4P3/1QN5/PPPP1PPP/R1BBK2R w KQ - 3 3").unwrap();
+        let mv = make_best_move(4, &board).unwrap();
+        assert!(mv.from == Coord{x: 4, y: 3} );
+        assert!(mv.to == Coord{x: 3, y: 1} );
+        board.do_move_from_coord(mv).unwrap();
+        board.do_move_from_coord(make_best_move(3, &board).unwrap()).unwrap();
+        let mv = make_best_move(3, &board).unwrap();
+        assert!(mv.from == Coord{x: 3, y: 1} );
+        assert!(mv.to == Coord{x: 2, y: 3} );
+    }
+
 }

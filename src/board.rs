@@ -147,13 +147,19 @@ impl Board {
                 'b' => board.board[y][x] = Square::Occupied(Piece::bishop(PieceColor::Black)),
                 'r' => board.board[y][x] = Square::Occupied(Piece::rook(PieceColor::Black)),
                 'q' => board.board[y][x] = Square::Occupied(Piece::queen(PieceColor::Black)),
-                'k' => board.board[y][x] = Square::Occupied(Piece::king(PieceColor::Black)),
+                'k' => {
+                    board.board[y][x] = Square::Occupied(Piece::king(PieceColor::Black));
+                    board.black_king = Coord {x, y};
+                },
                 'P' => board.board[y][x] = Square::Occupied(Piece::pawn(PieceColor::White)),
                 'N' => board.board[y][x] = Square::Occupied(Piece::knight(PieceColor::White)),
                 'B' => board.board[y][x] = Square::Occupied(Piece::bishop(PieceColor::White)),
                 'R' => board.board[y][x] = Square::Occupied(Piece::rook(PieceColor::White)),
                 'Q' => board.board[y][x] = Square::Occupied(Piece::queen(PieceColor::White)),
-                'K' => board.board[y][x] = Square::Occupied(Piece::king(PieceColor::White)),
+                'K' => {
+                    board.board[y][x] = Square::Occupied(Piece::king(PieceColor::White));
+                    board.white_king = Coord {x, y};
+                },
                 '/' => {
                     x = 0;
                     y += 1;

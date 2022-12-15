@@ -244,7 +244,7 @@ fn minimax(
     let mut best_move_value;
 
     if is_maximizing {
-        best_move_value = i32::MIN;
+        best_move_value = i32::MIN+1;
 
         for m in legal_moves {
             let mut board = *board;
@@ -264,7 +264,7 @@ fn minimax(
             }
         }
     } else {
-        best_move_value = i32::MAX;
+        best_move_value = i32::MAX-1;
 
         for m in legal_moves {
             let mut board = *board;
