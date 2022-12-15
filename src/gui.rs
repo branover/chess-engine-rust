@@ -48,7 +48,7 @@ lazy_static! {
 
 const SQUARE_SIZE: u16 = 48;
 // pub const AI_DEPTH: i32 = if cfg!(debug_assertions) {2} else {4};
-pub const AI_DEPTH: u8 = 4;
+pub const AI_DEPTH: u8 = 5;
 
 
 pub fn get_symbol(piece: &Piece) -> impl ToString {
@@ -71,14 +71,8 @@ pub fn get_symbol(piece: &Piece) -> impl ToString {
 }
 
 pub fn best_move(board: &Board) -> Move {
-    // board.get_best_next_move(AI_DEPTH).0
-    // Move{from: Coord {x:0, y:0} , to: Coord {x:0, y:1}, promote: None}
     make_best_move(AI_DEPTH, board).unwrap()
 }
-
-// pub fn worst_move(board: &Board) -> Move {
-//     board.get_worst_next_move(AI_DEPTH).0
-// }
 
 pub fn random_move(board: &Board) -> Move {
     let moves = board.list_all_valid_moves();

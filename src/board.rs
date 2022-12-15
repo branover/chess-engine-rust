@@ -81,7 +81,7 @@ impl Move {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub struct Board {
     pub board: [[Square; 8]; 8],
     pub turn: PieceColor,
@@ -95,9 +95,6 @@ pub struct Board {
     pub en_passant: Option<Coord>,
     pub halfmove_clock: u8,
     pub fullmove_number: u8,
-    pub moves: Vec<Move>,
-    // pub attacks: Vec<Move>,
-    // pub defends: Vec<Move>,
 }
 
 impl Board {
@@ -115,9 +112,6 @@ impl Board {
             en_passant: None,
             halfmove_clock: 0,
             fullmove_number: 1,
-            moves: Vec::new(),
-            // attacks: Vec::new(),
-            // defends: Vec::new(),
         }
     }
 
@@ -133,7 +127,6 @@ impl Board {
             [Square::Occupied(Piece::pawn(PieceColor::White)); 8],
             [Square::Occupied(Piece::rook(PieceColor::White)), Square::Occupied(Piece::knight(PieceColor::White)), Square::Occupied(Piece::bishop(PieceColor::White)), Square::Occupied(Piece::queen(PieceColor::White)), Square::Occupied(Piece::king(PieceColor::White)), Square::Occupied(Piece::bishop(PieceColor::White)), Square::Occupied(Piece::knight(PieceColor::White)), Square::Occupied(Piece::rook(PieceColor::White))],
         ];
-        board.store_all_valid_moves();
         board
     }
 
@@ -216,7 +209,6 @@ impl Board {
         board.fullmove_number = fullmove_number.parse::<u8>().map_err(|_| BoardError::ParseError("Invalid fullmove clock".to_string()))?;
 
         board.set_check();
-        board.store_all_valid_moves();        
         board.check_end_conditions();
         Ok(board)
     }
@@ -305,7 +297,7 @@ impl Board {
 
     pub fn do_move_from_coord(&mut self, mv: Move) -> Result<()> {
         let (from, to) = (mv.from, mv.to);
-        if !self.list_all_valid_moves().contains(&mv) {
+        if !self.is_valid_move(mv) {
             return Err(BoardError::MoveError(format!("Invalid move from {} to {}", from.to_notation(), to.to_notation())));
         }
         if self.is_castle(from, to) {
@@ -323,7 +315,6 @@ impl Board {
     fn end_turn(&mut self) {
         self.turn = self.turn.opposite();
         self.set_check();
-        self.store_all_valid_moves();       
         self.check_end_conditions();
     }
 
@@ -548,7 +539,7 @@ impl Board {
         false
     }
 
-    fn calc_all_valid_moves(&self) -> Vec<Move> {
+    pub fn list_all_valid_moves(&self) -> Vec<Move> {
         let mut moves = Vec::new();
         for y in 0..8 {
             for x in 0..8 {
@@ -569,20 +560,23 @@ impl Board {
         moves
     }
 
-    fn store_all_valid_moves(&mut self) {
-        self.moves = self.calc_all_valid_moves();
-    }
-
-    pub fn list_all_valid_moves(&self) -> Vec<Move> {
-        if self.moves.is_empty() {
-            self.calc_all_valid_moves()
-        } else {
-            self.moves.clone()
-        }
-    }
-
     pub fn has_valid_moves(&self) -> bool {
-        !&self.moves.is_empty()
+        for y in 0..8 {
+            for x in 0..8 {
+                let from = Coord { x, y };
+                if let Some(piece) = self.piece_at(from) {
+                    if piece.color == self.turn {
+                        let this_piece_moves = piece.list_possible_moves(from);
+                        for mv in this_piece_moves {
+                            if self.is_valid_move(Move::new(from, mv, None)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 
     fn would_be_in_check(&self, mv: Move) -> bool {

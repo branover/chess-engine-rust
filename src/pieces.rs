@@ -81,10 +81,7 @@ impl Piece {
 
     pub fn is_valid_piece_move(&self, from: Coord, to: Coord) -> bool {
         // Check that coords are from (0,0) to (7,7)
-        if from.x > 7 || from.y > 7 || to.x > 7 || to.y > 7 {
-            return false;
-        }
-        from != to && 
+        from.x < 8 && from.y < 8 && to.x < 8 && to.y < 8 && from != to && 
         match self.kind {
             Pawn => self.is_valid_pawn_move(from, to),
             Knight => self.is_valid_knight_move(from, to),
@@ -320,25 +317,11 @@ impl Piece {
 
     fn list_possible_rook_moves(&self, from: Coord) -> Vec<Coord> {
         let mut moves = Vec::new();
-        let mut to_x: i32 = from.x as i32 + 1;
-        while to_x < 8 {
-            moves.push(Coord { x: to_x as usize, y: from.y });
-            to_x += 1;
+        for x in 0..8 {
+            moves.push(Coord { x: x, y: from.y });
         }
-        to_x = from.x as i32 - 1;
-        while to_x >= 0 {
-            moves.push(Coord { x: to_x as usize, y: from.y });
-            to_x -= 1;
-        }
-        let mut to_y: i32 = from.y as i32 + 1;
-        while to_y < 8 {
-            moves.push(Coord { x: from.x, y: to_y as usize });
-            to_y += 1;
-        }
-        to_y = from.y as i32 - 1;
-        while to_y >= 0 {
-            moves.push(Coord { x: from.x, y: to_y as usize });
-            to_y -= 1;
+        for y in 0..8 {
+            moves.push(Coord { x: from.x, y: y });
         }
         moves
     }
