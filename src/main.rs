@@ -50,7 +50,6 @@ use chess_engine::{
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let b = Board::default();
-
     // run(random_move, b)?;
     run(best_move, b)?;
     Ok(())

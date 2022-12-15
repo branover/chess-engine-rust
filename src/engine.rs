@@ -37,9 +37,9 @@ fn calculate_material(board: &Board, color: PieceColor) -> i32 {
     score
 }
 
-pub fn make_best_move(depth: u8, board: Board) -> Option<Move> {
+pub fn make_best_move(depth: u8, board: &Board) -> Option<Move> {
     // Call minimax algorithm
-    let possible_moves = board.list_all_valid_moves();
+    let possible_moves = board.list_all_valid_moves().clone();
     if possible_moves.len() == 0 {
         return None
     }
@@ -51,7 +51,7 @@ pub fn make_best_move(depth: u8, board: Board) -> Option<Move> {
         .into_iter()
         .map(|m|  {
             let getting_move_for = board.turn;
-            let mut board = board;
+            let mut board = board.clone();
             match board.do_move_from_coord(m.from, m.to) {
                 Ok(_) => {
                     let handle = thread::spawn(move || {
@@ -101,8 +101,8 @@ fn minimax(
     if is_maximizing {
         best_move_value = i32::MIN;
 
-        for m in &legal_moves {
-            let mut board = board;
+        for m in legal_moves {
+            let mut board = board.clone();
             let child_board_value = match board.do_move_from_coord(m.from, m.to) {
                 Ok(_) => minimax(board, depth - 1, alpha, beta, !is_maximizing, getting_move_for),
                 Err(_) => {
@@ -125,8 +125,8 @@ fn minimax(
     } else {
         best_move_value = i32::MAX;
 
-        for m in &legal_moves {
-            let mut board = board;
+        for m in legal_moves {
+            let mut board = board.clone();
             let child_board_value = match board.do_move_from_coord(m.from, m.to) {
                 Ok(_) => minimax(board, depth - 1, alpha, beta, !is_maximizing, getting_move_for),
                 Err(_) => {
@@ -171,34 +171,56 @@ fn eval_position(board: &Board, color: PieceColor) -> i32 {
         }
     };
     calculate_material(board, color) + calc_attack_defend_score(board, color)
+    // calculate_material(board, color)
+
 }
+
+// pub fn calc_attack_defend_score(board: &Board, color: PieceColor) -> i32 {
+//     let mut score = 0;
+
+//     for y in 0..8 {
+//         for x in 0..8 {
+//             let coord = Coord { x, y };
+//             if let Some(piece) = board.piece_at(coord) {
+//                 let this_piece_moves = piece.list_possible_moves(coord);
+//                 for m in this_piece_moves {
+//                     if board.can_attack_square(coord, m) {
+//                         if let Some(piece) = board.piece_at(m) {
+//                             if piece.color == color {
+//                                 // Piece is defended
+//                                 score += piece_score(piece.kind) / 10;
+//                             } else {
+//                                 // Piece is attacked
+//                                 score += piece_score(piece.kind) / 5;
+//                             }
+//                         } else {
+//                             // Empty square is attacked
+//                             score += 10;
+//                         }
+//                     } 
+//                 }
+                
+//             }
+//         }
+//     }
+//     score
+// }
 
 pub fn calc_attack_defend_score(board: &Board, color: PieceColor) -> i32 {
     let mut score = 0;
 
-    for y in 0..8 {
-        for x in 0..8 {
-            let coord = Coord { x, y };
-            if let Some(piece) = board.piece_at(coord) {
-                let this_piece_moves = piece.list_possible_moves(coord);
-                for m in this_piece_moves {
-                    if board.can_attack_square(coord, m) {
-                        if let Some(piece) = board.piece_at(m) {
-                            if piece.color == color {
-                                // Piece is defended
-                                score += piece_score(piece.kind) / 10;
-                            } else {
-                                // Piece is attacked
-                                score += piece_score(piece.kind) / 5;
-                            }
-                        } else {
-                            // Empty square is attacked
-                            score += 10;
-                        }
-                    } 
-                }
-                
+    for mv in board.list_all_valid_moves() {
+        if let Some(piece) = board.piece_at(mv.from) {
+            if piece.color == color {
+                // Piece is defended
+                score += piece_score(piece.kind) / 10;
+            } else {
+                // Piece is attacked
+                score += piece_score(piece.kind) / 5;
             }
+        } else {
+            // Empty square is attacked
+            score += 10;
         }
     }
     score

@@ -73,7 +73,7 @@ pub fn get_symbol(piece: &Piece) -> impl ToString {
 pub fn best_move(board: &Board) -> Move {
     // board.get_best_next_move(AI_DEPTH).0
     // Move{from: Coord {x:0, y:0} , to: Coord {x:0, y:1}, promote: None}
-    make_best_move(AI_DEPTH, *board).unwrap()
+    make_best_move(AI_DEPTH, board).unwrap()
 }
 
 // pub fn worst_move(board: &Board) -> Move {
@@ -218,7 +218,7 @@ impl container::StyleSheet for ChessBoardStyle {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct ChessBoard {
     get_cpu_move: fn(&Board) -> Move,
     starting_board: Board,
@@ -233,13 +233,14 @@ impl Default for ChessBoard {
         let x = GET_CPU_MOVE.lock().unwrap();
         let get_cpu_move = *x;
         let x = STARTING_BOARD.lock().unwrap();
-        let starting_board = *x;
+        let starting_board = x.clone();
+        let board = x.clone();
         Self {
             get_cpu_move,
             starting_board,
             result: GameResult::Continuing,
             from_square: None,
-            board: starting_board,
+            board: board,
             squares: [button::State::default(); 64]
         }
     }
@@ -264,7 +265,7 @@ impl Sandbox for ChessBoard {
     fn update(&mut self, message: Message) {
         match self.result {
             GameResult::Victory(_) | GameResult::Stalemate => {
-                self.board = self.starting_board;
+                self.board = self.starting_board.clone();
                 self.result = GameResult::Continuing;
             },
             _ => {
@@ -305,7 +306,7 @@ impl Sandbox for ChessBoard {
                                 };
                             },
                             GameResult::Victory(_) | GameResult::Stalemate => {
-                                self.board = self.starting_board;
+                                self.board = self.starting_board.clone();
                             }
                             _ => {}
                         }
