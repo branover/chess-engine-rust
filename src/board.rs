@@ -75,6 +75,12 @@ pub struct Move {
     pub promote: Option<PieceKind>,
 }
 
+impl Move {
+    pub fn new(from: Coord, to: Coord, promote: Option<PieceKind>) -> Self {
+        Move { from, to, promote }
+    }
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct Board {
     pub board: [[Square; 8]; 8],
@@ -90,6 +96,8 @@ pub struct Board {
     pub halfmove_clock: u8,
     pub fullmove_number: u8,
     pub moves: Vec<Move>,
+    // pub attacks: Vec<Move>,
+    // pub defends: Vec<Move>,
 }
 
 impl Board {
@@ -108,6 +116,8 @@ impl Board {
             halfmove_clock: 0,
             fullmove_number: 1,
             moves: Vec::new(),
+            // attacks: Vec::new(),
+            // defends: Vec::new(),
         }
     }
 
@@ -236,7 +246,8 @@ impl Board {
 
     }
 
-    pub fn move_piece(&mut self, from: Coord, to: Coord) -> Result<()> {
+    pub fn move_piece(&mut self, mv: Move) -> Result<()> {
+        let (from, to) = (mv.from, mv.to);
         let piece = self.board[from.y][from.x];
         if let Square::Occupied(piece) = piece {
             self.board[from.y][from.x] = Square::Empty;
@@ -289,11 +300,12 @@ impl Board {
     }
 
     pub fn do_move(&mut self, from: &str, to: &str) -> Result<()> {
-        self.do_move_from_coord(Coord::from_notation(from)?, Coord::from_notation(to)?)
+        self.do_move_from_coord(Move::new(Coord::from_notation(from)?, Coord::from_notation(to)?, None))
     }
 
-    pub fn do_move_from_coord(&mut self, from: Coord, to: Coord) -> Result<()> {
-        if !self.list_all_valid_moves().contains(&Move {from, to, promote: None}) {
+    pub fn do_move_from_coord(&mut self, mv: Move) -> Result<()> {
+        let (from, to) = (mv.from, mv.to);
+        if !self.list_all_valid_moves().contains(&mv) {
             return Err(BoardError::MoveError(format!("Invalid move from {} to {}", from.to_notation(), to.to_notation())));
         }
         if self.is_castle(from, to) {
@@ -301,7 +313,7 @@ impl Board {
         } else if self.is_en_passant(from, to) {
             self.do_en_passant(from, to)?;
         } else {
-            self.move_piece(from, to)?; 
+            self.move_piece(mv)?; 
         }
         self.end_turn();
         Ok(())
@@ -315,16 +327,17 @@ impl Board {
         self.check_end_conditions();
     }
 
-    pub fn parse_move(&self, notation: &str) -> Result<(String, String)> {
+    pub fn parse_move(&self, notation: &str) -> Result<Move> {
         let mut chars = notation.chars();
         let from = chars.by_ref().take(2).collect::<String>();
         let to = chars.by_ref().take(2).collect::<String>();
         // let promotion = chars.next().map(|c| PieceKind::from_char(c));
-        Ok((from, to))
+        Ok(Move::new(Coord::from_notation(&from)?, Coord::from_notation(&to)?, None))
     }
 
     #[inline]
-    pub fn is_valid_move(&self, from: Coord, to: Coord) -> bool {
+    pub fn is_valid_move(&self, mv: Move) -> bool {
+        let (from, to) = (mv.from, mv.to);
         let piece = match self.piece_at(from) {
             Some(piece) => piece,
             _ => return false,
@@ -345,12 +358,12 @@ impl Board {
         }
 
         // If the player is in check, they must remove check
-        if self.get_check() && !self.removes_check(from, to) {
+        if self.get_check() && !self.removes_check(mv) {
             return false;
         }
 
         // If the player is not in check, they must not move into check
-        if self.would_be_in_check(from, to) {
+        if self.would_be_in_check(mv) {
             return false;
         }
 
@@ -455,13 +468,13 @@ impl Board {
     fn do_castle(&mut self, from: Coord, to: Coord) -> Result<()> {
         if to.x == 6 {
             // Kingside castle
-            self.move_piece(from, to)?;
-            self.move_piece(Coord { x: 7, y: from.y }, Coord { x: 5, y: from.y })?;
+            self.move_piece(Move::new(from, to, None))?;
+            self.move_piece(Move::new(Coord { x: 7, y: from.y }, Coord { x: 5, y: from.y }, None))?;
 
         } else if to.x == 2 {
             // Queenside castle
-            self.move_piece(from, to)?;
-            self.move_piece(Coord { x: 0, y: from.y }, Coord { x: 3, y: from.y })?;
+            self.move_piece(Move::new(from, to, None))?;
+            self.move_piece(Move::new(Coord { x: 0, y: from.y }, Coord { x: 3, y: from.y }, None))?;
 
         } else {
             return Err(BoardError::MoveError("Invalid castle".to_string()));
@@ -486,7 +499,7 @@ impl Board {
 
         if let Some(en_passant) = self.en_passant {
             if en_passant == to {
-                self.move_piece(from, to)?;
+                self.move_piece(Move::new(from, to, None))?;
                 // Remove the captured pawn in front of the en passant square
                 let captured_pawn_square = match piece.color {
                     PieceColor::White => Coord{x: to.x, y: to.y + 1},
@@ -539,13 +552,14 @@ impl Board {
         let mut moves = Vec::new();
         for y in 0..8 {
             for x in 0..8 {
-                let coord = Coord { x, y };
-                if let Some(piece) = self.piece_at(coord) {
+                let from = Coord { x, y };
+                if let Some(piece) = self.piece_at(from) {
                     if piece.color == self.turn {
-                        let this_piece_moves = piece.list_possible_moves(coord);
-                        this_piece_moves.iter().for_each(|m| {
-                            if self.is_valid_move(coord, *m) {
-                                moves.push(Move { from: coord, to: *m, promote: None});
+                        let this_piece_moves = piece.list_possible_moves(from);
+                        this_piece_moves.iter().for_each(|to| {
+                            let mv = Move::new(from, *to, None);
+                            if self.is_valid_move(mv) {
+                                moves.push(mv);
                             }
                         });
                     }
@@ -571,15 +585,15 @@ impl Board {
         !&self.moves.is_empty()
     }
 
-    fn would_be_in_check(&self, from: Coord, to: Coord) -> bool {
+    fn would_be_in_check(&self, mv: Move) -> bool {
         let mut board = self.clone();
-        board.move_piece(from, to).unwrap();
+        board.move_piece(mv).unwrap();
         board.turn = board.turn.opposite();
         board.is_in_check(self.turn)
     }
 
-    fn removes_check(&self, from: Coord, to: Coord) -> bool {
-        !self.would_be_in_check(from, to)
+    fn removes_check(&self, mv: Move) -> bool {
+        !self.would_be_in_check(mv)
     }
 
     fn is_in_check(&self, color: PieceColor) -> bool {

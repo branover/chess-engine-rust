@@ -48,7 +48,7 @@ lazy_static! {
 
 const SQUARE_SIZE: u16 = 48;
 // pub const AI_DEPTH: i32 = if cfg!(debug_assertions) {2} else {4};
-pub const AI_DEPTH: u8 = 6;
+pub const AI_DEPTH: u8 = 4;
 
 
 pub fn get_symbol(piece: &Piece) -> impl ToString {
@@ -277,7 +277,7 @@ impl Sandbox for ChessBoard {
                         let m = Move { from, to, promote: None };
                         
                         self.from_square = None;
-                        self.result = match self.board.do_move_from_coord(m.from, m.to) {
+                        self.result = match self.board.do_move_from_coord(m) {
                             Ok(_) => {
                                 if self.board.get_checkmate() {
                                     GameResult::Victory(self.board.turn)
@@ -292,7 +292,7 @@ impl Sandbox for ChessBoard {
                         match self.result {
                             GameResult::Continuing => {
                                 let cpu_move = (self.get_cpu_move)(&self.board);
-                                self.result = match self.board.do_move_from_coord(cpu_move.from, cpu_move.to) {
+                                self.result = match self.board.do_move_from_coord(cpu_move) {
                                     Ok(_) => {
                                         if self.board.get_checkmate() {
                                             GameResult::Victory(self.board.turn)

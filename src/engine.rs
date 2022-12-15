@@ -8,7 +8,8 @@ use crate::pieces::{
     PieceColor,
     PieceKind,
 };
-use std::thread;
+use threadpool::ThreadPool;
+use std::sync::mpsc::channel;
 
 fn piece_score(piece: PieceKind) -> i32 {
     match piece {
@@ -37,6 +38,49 @@ fn calculate_material(board: &Board, color: PieceColor) -> i32 {
     score
 }
 
+// pub fn make_best_move(depth: u8, board: &Board) -> Option<Move> {
+//     // Call minimax algorithm
+//     let possible_moves = board.list_all_valid_moves().clone();
+//     if possible_moves.len() == 0 {
+//         return None
+//     }
+
+//     let mut best_move = Move{from: Coord{x: 0, y: 0}, to: Coord{x: 0, y: 0}, promote: None};
+//     let mut best_score = i32::MIN;
+ 
+//     let handles = possible_moves
+//         .into_iter()
+//         .map(|m|  {
+//             let getting_move_for = board.turn;
+//             let mut board = board.clone();
+//             match board.do_move_from_coord(m.from, m.to) {
+//                 Ok(_) => {
+//                     let handle = thread::spawn(move || {
+//                         let score = minimax(board, depth, i32::MIN, i32::MAX, false, getting_move_for);
+//                         // println!("Move: {:?}, Score: {}", m, score);
+//                         (m, score)
+//                     });
+//                     Ok(handle)
+//                 },
+//                 Err(e) => {
+//                     Err(e)
+//                 }
+//             }            
+//         }).filter_map(|result| result.ok())
+//         .collect::<Vec<_>>();
+
+//     handles.into_iter().for_each(|handle| {
+//         let (m, score) = handle.join().unwrap();
+//         if score > best_score {
+//             best_score = score;
+//             best_move = m;
+//         }
+//     });
+
+//     // println!("Max score: {}, Move: {:?}", best_score, best_move);
+//     Some(best_move)        
+// }
+
 pub fn make_best_move(depth: u8, board: &Board) -> Option<Move> {
     // Call minimax algorithm
     let possible_moves = board.list_all_valid_moves().clone();
@@ -46,35 +90,30 @@ pub fn make_best_move(depth: u8, board: &Board) -> Option<Move> {
 
     let mut best_move = Move{from: Coord{x: 0, y: 0}, to: Coord{x: 0, y: 0}, promote: None};
     let mut best_score = i32::MIN;
- 
-    let handles = possible_moves
-        .into_iter()
-        .map(|m|  {
-            let getting_move_for = board.turn;
-            let mut board = board.clone();
-            match board.do_move_from_coord(m.from, m.to) {
-                Ok(_) => {
-                    let handle = thread::spawn(move || {
-                        let score = minimax(board, depth, i32::MIN, i32::MAX, false, getting_move_for);
-                        // println!("Move: {:?}, Score: {}", m, score);
-                        (m, score)
-                    });
-                    Ok(handle)
-                },
-                Err(e) => {
-                    Err(e)
-                }
-            }            
-        }).filter_map(|result| result.ok())
-        .collect::<Vec<_>>();
 
-    handles.into_iter().for_each(|handle| {
-        let (m, score) = handle.join().unwrap();
+    let n_jobs = possible_moves.len();
+    let n_workers = std::thread::available_parallelism().unwrap().get();
+    let pool = ThreadPool::new(n_workers);
+
+    let (tx, rx) = channel();
+
+    for m in possible_moves {
+        let getting_move_for = board.turn;
+        let board = board.clone();
+        let tx = tx.clone();
+        pool.execute(move || {
+            let score = minimax(board, depth, i32::MIN, i32::MAX, false, getting_move_for);
+            tx.send((m, score)).unwrap();
+        });
+    }
+
+    for _ in 0..n_jobs {
+        let (m, score) = rx.recv().unwrap();
         if score > best_score {
             best_score = score;
             best_move = m;
         }
-    });
+    }
 
     // println!("Max score: {}, Move: {:?}", best_score, best_move);
     Some(best_move)        
@@ -103,7 +142,7 @@ fn minimax(
 
         for m in legal_moves {
             let mut board = board.clone();
-            let child_board_value = match board.do_move_from_coord(m.from, m.to) {
+            let child_board_value = match board.do_move_from_coord(m) {
                 Ok(_) => minimax(board, depth - 1, alpha, beta, !is_maximizing, getting_move_for),
                 Err(_) => {
                     continue;
@@ -127,7 +166,7 @@ fn minimax(
 
         for m in legal_moves {
             let mut board = board.clone();
-            let child_board_value = match board.do_move_from_coord(m.from, m.to) {
+            let child_board_value = match board.do_move_from_coord(m) {
                 Ok(_) => minimax(board, depth - 1, alpha, beta, !is_maximizing, getting_move_for),
                 Err(_) => {
                     continue;
@@ -175,53 +214,53 @@ fn eval_position(board: &Board, color: PieceColor) -> i32 {
 
 }
 
-// pub fn calc_attack_defend_score(board: &Board, color: PieceColor) -> i32 {
-//     let mut score = 0;
-
-//     for y in 0..8 {
-//         for x in 0..8 {
-//             let coord = Coord { x, y };
-//             if let Some(piece) = board.piece_at(coord) {
-//                 let this_piece_moves = piece.list_possible_moves(coord);
-//                 for m in this_piece_moves {
-//                     if board.can_attack_square(coord, m) {
-//                         if let Some(piece) = board.piece_at(m) {
-//                             if piece.color == color {
-//                                 // Piece is defended
-//                                 score += piece_score(piece.kind) / 10;
-//                             } else {
-//                                 // Piece is attacked
-//                                 score += piece_score(piece.kind) / 5;
-//                             }
-//                         } else {
-//                             // Empty square is attacked
-//                             score += 10;
-//                         }
-//                     } 
-//                 }
-                
-//             }
-//         }
-//     }
-//     score
-// }
-
 pub fn calc_attack_defend_score(board: &Board, color: PieceColor) -> i32 {
     let mut score = 0;
 
-    for mv in board.list_all_valid_moves() {
-        if let Some(piece) = board.piece_at(mv.from) {
-            if piece.color == color {
-                // Piece is defended
-                score += piece_score(piece.kind) / 10;
-            } else {
-                // Piece is attacked
-                score += piece_score(piece.kind) / 5;
+    for y in 0..8 {
+        for x in 0..8 {
+            let coord = Coord { x, y };
+            if let Some(piece) = board.piece_at(coord) {
+                let this_piece_moves = piece.list_possible_moves(coord);
+                for m in this_piece_moves {
+                    if board.can_attack_square(coord, m) {
+                        if let Some(piece) = board.piece_at(m) {
+                            if piece.color == color {
+                                // Piece is defended
+                                score += piece_score(piece.kind) / 10;
+                            } else {
+                                // Piece is attacked
+                                score += piece_score(piece.kind) / 5;
+                            }
+                        } else {
+                            // Empty square is attacked
+                            score += 10;
+                        }
+                    } 
+                }
+                
             }
-        } else {
-            // Empty square is attacked
-            score += 10;
         }
     }
     score
 }
+
+// pub fn calc_attack_defend_score(board: &Board, color: PieceColor) -> i32 {
+//     let mut score = 0;
+
+//     for mv in board.list_all_valid_moves() {
+//         if let Some(piece) = board.piece_at(mv.from) {
+//             if piece.color == color {
+//                 // Piece is defended
+//                 score += piece_score(piece.kind) / 10;
+//             } else {
+//                 // Piece is attacked
+//                 score += piece_score(piece.kind) / 5;
+//             }
+//         } else {
+//             // Empty square is attacked
+//             score += 10;
+//         }
+//     }
+//     score
+// }

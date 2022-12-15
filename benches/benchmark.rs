@@ -25,7 +25,7 @@ pub fn engine(depth: u8, moves: u8) {
     let mut board = Board::default();
     for _ in 0..moves {
         let mv = make_best_move(depth, &board).unwrap();
-        board.do_move_from_coord(mv.from, mv.to).unwrap();
+        board.do_move_from_coord(mv).unwrap();
     }
 }
 
