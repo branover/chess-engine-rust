@@ -318,10 +318,10 @@ impl Piece {
     fn list_possible_rook_moves(&self, from: Coord) -> Vec<Coord> {
         let mut moves = Vec::new();
         for x in 0..8 {
-            moves.push(Coord { x: x, y: from.y });
+            moves.push(Coord { x, y: from.y });
         }
         for y in 0..8 {
-            moves.push(Coord { x: from.x, y: y });
+            moves.push(Coord { x: from.x, y });
         }
         moves
     }

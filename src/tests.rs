@@ -8,13 +8,14 @@ mod tests {
         Board,
         Coord,
         Square,
+        Move,
     };
     use crate::pieces::{
         Piece,
         PieceColor,
         PieceKind,
     };
-    use crate::engine::make_best_move;
+    use crate::engine::{make_best_move};
 
 
     #[bench]
@@ -583,6 +584,16 @@ mod tests {
         let mv = make_best_move(3, &board).unwrap();
         assert!(mv.from == Coord{x: 3, y: 1} );
         assert!(mv.to == Coord{x: 2, y: 3} );
+    }
+
+    #[test]
+    fn engine_avoid_stalemate() {
+        let mut board = Board::from_fen("6k1/5pp1/5P1p/1p6/3p4/p7/2p1r3/2K5 b - - 0 58").unwrap();
+        let mv = make_best_move(7, &board).unwrap();
+        assert!(mv.from == Coord{x: 0, y: 5} );
+        assert!(mv.to == Coord{x: 0, y: 6} );
+        board.do_move_from_coord(mv).unwrap();
+        board.do_move_from_coord(Move::new(Coord{x: 5, y: 2}, Coord{x: 6, y: 1}, None)).unwrap();
     }
 
 }

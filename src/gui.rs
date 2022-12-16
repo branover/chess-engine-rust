@@ -227,14 +227,14 @@ impl Default for ChessBoard {
         let x = GET_CPU_MOVE.lock().unwrap();
         let get_cpu_move = *x;
         let x = STARTING_BOARD.lock().unwrap();
-        let starting_board = x.clone();
-        let board = x.clone();
+        let starting_board = *x;
+        let board = *x;
         Self {
             get_cpu_move,
             starting_board,
             result: GameResult::Continuing,
             from_square: None,
-            board: board,
+            board,
             squares: [button::State::default(); 64]
         }
     }
@@ -249,8 +249,8 @@ impl Sandbox for ChessBoard {
 
     fn title(&self) -> String {
         match self.result {
-            GameResult::Victory(color) => format!("{} wins", color),
-            GameResult::Stalemate => format!("Stalemate"),
+            GameResult::Victory(color) => format!("{color} wins"),
+            GameResult::Stalemate => "Stalemate".to_string(),
             GameResult::IllegalMove(m) => format!("Illegal move by {}, '({},{})'", self.board.turn, m.from.to_notation(), m.to.to_notation()),
             _ => String::from("Chess")
         }
@@ -259,7 +259,7 @@ impl Sandbox for ChessBoard {
     fn update(&mut self, message: Message) {
         match self.result {
             GameResult::Victory(_) | GameResult::Stalemate => {
-                self.board = self.starting_board.clone();
+                self.board = self.starting_board;
                 self.result = GameResult::Continuing;
             },
             _ => {
@@ -300,7 +300,7 @@ impl Sandbox for ChessBoard {
                                 };
                             },
                             GameResult::Victory(_) | GameResult::Stalemate => {
-                                self.board = self.starting_board.clone();
+                                self.board = self.starting_board;
                             }
                             _ => {}
                         }

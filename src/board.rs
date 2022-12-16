@@ -52,7 +52,7 @@ impl Coord {
         let mut chars = notation.chars();
         let x = chars.next().ok_or(BoardError::ParseError("Invalid notation".to_string()))?;
         let y = chars.next().ok_or(BoardError::ParseError("Invalid notation".to_string()))?;
-        if x < 'a' || x > 'h' || y < '1' || y > '8' {
+        if !('a'..='h').contains(&x) || !('1'..='8').contains(&y) {
             return Err(BoardError::ParseError("Invalid notation".to_string()));
         }
 
@@ -586,7 +586,7 @@ impl Board {
     }
 
     fn would_be_in_check(&self, mv: Move) -> bool {
-        let mut board = self.clone();
+        let mut board = *self;
         board.move_piece(mv).unwrap();
         board.turn = board.turn.opposite();
         board.is_in_check(self.turn)
